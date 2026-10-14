@@ -15,6 +15,12 @@
 #define DESENHO_LARG 72
 #define DESENHO_ALT  108
 
+/* fazer o personagem andar, definindo limites no chao  */
+#define LIMITE_ESQ 40
+#define LIMITE_DIR 1240
+#define LIMITE_CIMA 500
+#define LIMITE_BAIXO 700
+
 // registro de cada jogador 
 typedef struct {
     char nome[30];
@@ -26,6 +32,10 @@ typedef struct {
     float velocidade;
     int direcao;     // 0 = frente, 1 = esquerda, 2 = costas, 3 = direita
     int frame;       // 0 = parado, 1 e 2 = passos
+
+    // fazer personagem andar
+    int furtivo;     
+    int contador;    
 } Jogador;
 
 void iniciarJogador(Jogador *j) {
@@ -38,6 +48,10 @@ void iniciarJogador(Jogador *j) {
     j->velocidade = 3.5;
     j->direcao = 0;
     j->frame = 0;
+
+    // personagem andar
+    j->furtivo = 0;
+    j->contador = 0;
 }
 // inicia com uma funcao que carrega o ponteiro do jogo e suas vidas, pontos e etc de acordo 
 
@@ -82,7 +96,7 @@ void desenharJogador(Jogador *j, ALLEGRO_BITMAP *sprites[3][3]) {
     int linha = j->direcao;
     int flags = 0;
 
-    /* pega o png do personagem e inverte a posicao para a direita */
+    // pega o png do personagem e inverte a posicao para a direita
     if (j->direcao == 3) {
         linha = 1;
         flags = ALLEGRO_FLIP_HORIZONTAL;
@@ -93,6 +107,71 @@ void desenharJogador(Jogador *j, ALLEGRO_BITMAP *sprites[3][3]) {
         j->x - DESENHO_LARG / 2, j->y - DESENHO_ALT,
         DESENHO_LARG, DESENHO_ALT, flags);
 }
+
+
+// funcao para fazer o personagem andar 
+void moverJogador(Jogador *j, ALLEGRO_KEYBOARD_STATE *teclado) {
+    float vel = j->velocidade;
+    int andando = 0;
+    int trocaFrame = 10;
+
+    // segurando o shift = modo furtivo 
+    if (al_key_down(teclado, ALLEGRO_KEY_LSHIFT) ||
+        al_key_down(teclado, ALLEGRO_KEY_RSHIFT)) {
+        j->furtivo = 1;
+        vel = vel / 2;
+        trocaFrame = 20;   
+    } else {
+        j->furtivo = 0;
+    }
+
+    if (al_key_down(teclado, ALLEGRO_KEY_LEFT) || al_key_down(teclado, ALLEGRO_KEY_A)) {
+        j->x = j->x - vel;
+        j->direcao = 1;
+        andando = 1;
+    }
+    if (al_key_down(teclado, ALLEGRO_KEY_RIGHT) || al_key_down(teclado, ALLEGRO_KEY_D)) {
+        j->x = j->x + vel;
+        j->direcao = 3;
+        andando = 1;
+    }
+    if (al_key_down(teclado, ALLEGRO_KEY_UP) || al_key_down(teclado, ALLEGRO_KEY_W)) {
+        j->y = j->y - vel;
+        j->direcao = 2;
+        andando = 1;
+    }
+    if (al_key_down(teclado, ALLEGRO_KEY_DOWN) || al_key_down(teclado, ALLEGRO_KEY_S)) {
+        j->y = j->y + vel;
+        j->direcao = 0;
+        andando = 1;
+    }
+
+    // limita a area de movimentacao do personagem para que ele nao saia
+    if (j->x < LIMITE_ESQ) j->x = LIMITE_ESQ;
+    if (j->x > LIMITE_DIR) j->x = LIMITE_DIR;
+    if (j->y < LIMITE_CIMA) j->y = LIMITE_CIMA;
+    if (j->y > LIMITE_BAIXO) j->y = LIMITE_BAIXO;
+
+    // alterando os frames enquanto anda
+    if (andando) {
+        j->contador++;
+        if (j->frame == 0) {
+            j->frame = 1;
+        }
+        if (j->contador >= trocaFrame) {
+            j->contador = 0;
+            if (j->frame == 1) {
+                j->frame = 2;
+            } else {
+                j->frame = 1;
+            }
+        }
+    } else {
+        j->frame = 0;
+        j->contador = 0;
+    }
+}
+
 
 // main 
 
@@ -105,6 +184,8 @@ int main(void) {
     Jogador jogador;
     int rodando = 1;
     int redesenhar = 1;
+    // utilizando a biblioteca allegro para pegar o estado do teclado
+    ALLEGRO_KEYBOARD_STATE teclado;
 
     if (!al_init()) {
         return 1;
@@ -152,6 +233,9 @@ int main(void) {
             rodando = 0;
         }
         if (evento.type == ALLEGRO_EVENT_TIMER) {
+            al_get_keyboard_state(&teclado);
+            // faz o personagem andar de acordo com a tecla pressionada
+            moverJogador(&jogador, &teclado);
             redesenhar = 1;
         }
 
