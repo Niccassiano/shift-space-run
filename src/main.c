@@ -110,6 +110,7 @@ void desenharJogador(Jogador *j, ALLEGRO_BITMAP *sprites[3][3]) {
 
 
 // funcao para fazer o personagem andar 
+// corrigir conforme o professor falou.
 void moverJogador(Jogador *j, ALLEGRO_KEYBOARD_STATE *teclado) {
     float vel = j->velocidade;
     int andando = 0;
