@@ -53,7 +53,7 @@ void iniciarJogador(Jogador *j) {
     j->furtivo = 0;
     j->contador = 0;
 }
-// inicia com uma funcao que carrega o ponteiro do jogo e suas vidas, pontos e etc de acordo 
+// inicia com uma funcao que carrega o ponteiro do jogo e suas vidas, pontos e etc 
 
 // pega sprites do personagem e faz ele andar
 int carregarSprites(ALLEGRO_BITMAP *sprites[3][3]) {
