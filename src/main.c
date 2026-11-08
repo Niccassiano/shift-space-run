@@ -55,36 +55,6 @@ void iniciarJogador(Jogador *j) {
 }
 // inicia com uma funcao que carrega o ponteiro do jogo e suas vidas, pontos e etc 
 
-// pega sprites do personagem e faz ele andar
-int carregarSprites(ALLEGRO_BITMAP *sprites[3][3]) {
-    char *nomes[3] = {"frente", "esquerda", "costas"};
-    char caminho[100];
-    int d, f;
-
-    for (d = 0; d < 3; d++) {
-        for (f = 0; f < 3; f++) {
-            sprintf(caminho, "sprites/prisioneiro_%s_%d.png", nomes[d], f);
-            sprites[d][f] = al_load_bitmap(caminho);
-            if (sprites[d][f] == NULL) {
-                return 0;
-            }
-        }
-    }
-    return 1;
-}
-
-void liberarSprites(ALLEGRO_BITMAP *sprites[3][3]) {
-    int d, f;
-
-    for (d = 0; d < 3; d++) {
-        for (f = 0; f < 3; f++) {
-            if (sprites[d][f] != NULL) {
-                al_destroy_bitmap(sprites[d][f]);
-            }
-        }
-    }
-}
-
 // desenhando o cenario e personagem
 void desenharCenario(ALLEGRO_BITMAP *fundo) {
     al_draw_scaled_bitmap(fundo,
@@ -92,20 +62,34 @@ void desenharCenario(ALLEGRO_BITMAP *fundo) {
         0, 0, LARGURA_TELA, ALTURA_TELA, 0);
 }
 
-void desenharJogador(Jogador *j, ALLEGRO_BITMAP *sprites[3][3]) {
-    int linha = j->direcao;
-    int flags = 0;
+// o recorte e calculado pela linha e coluna 
+// sx = coluna × FRAME_LARG -> coluna e o frame 
+// sy = linha × FRAME_ALT -> linha e a direcao do personagem
 
-    // pega o png do personagem e inverte a posicao para a direita
+// ALLEGRO_BITMAP *spritesheet -> imagem do personagem
+// Linha Direcao
+// 0	frente
+// 1	esquerda
+// 2	costas
+
+// Se j->direcao for igual a 2, o allegro vai selecionar a linha 2
+void desenharJogador(Jogador *j, ALLEGRO_BITMAP *spritesheet) {
+    int linha = j->direcao;
+    int flags = 0; // qual transformacao ele deve aplicar na imagem antes de desenha la na tela
+    
+    // direita reaproveita a linha da esquerda, vira a imagem para a direita
     if (j->direcao == 3) {
         linha = 1;
         flags = ALLEGRO_FLIP_HORIZONTAL;
     }
 
-    al_draw_scaled_bitmap(sprites[linha][j->frame],
-        0, 0, FRAME_LARG, FRAME_ALT,
-        j->x - DESENHO_LARG / 2, j->y - DESENHO_ALT,
-        DESENHO_LARG, DESENHO_ALT, flags);
+    int recorteX = j->frame * FRAME_LARG;   // qual coluna que sera desenhada
+    int recorteY = linha * FRAME_ALT;       // qual linha que sera desenhada
+
+    al_draw_scaled_bitmap(spritesheet,
+        recorteX, recorteY, FRAME_LARG, FRAME_ALT,           // seleciona o recorte da imagem
+        j->x - DESENHO_LARG / 2, j->y - DESENHO_ALT,         // destino na tela, basicamente onde sera desenhado
+        DESENHO_LARG, DESENHO_ALT, flags); // tamanho do personagem na tela e flags para virar a imagem
 }
 
 
@@ -181,7 +165,7 @@ int main(void) {
     ALLEGRO_EVENT_QUEUE *fila = NULL;
     ALLEGRO_TIMER *timer = NULL;
     ALLEGRO_BITMAP *fundo = NULL;
-    ALLEGRO_BITMAP *sprites[3][3] = {{NULL}};
+    ALLEGRO_BITMAP *spritesheet = NULL; // troca 9 matriz por apenas 1 sprite sheet
     Jogador jogador;
     int rodando = 1;
     int redesenhar = 1;
@@ -210,10 +194,14 @@ int main(void) {
     if (fundo == NULL) {
         return 1;
     }
-    if (!carregarSprites(sprites)) {
-        liberarSprites(sprites);
-        return 1;
+
+    // pega spritesheet do personagem e faz ele andar 
+    spritesheet = al_load_bitmap("sprites/prisioneiro.png");
+    if (spritesheet == NULL) {
+    return 1;
     }
+
+    // removido carregarSprites e liberarSprites, pois nao ha mais necessidade de carregar 9 imagens separadas
 
     al_register_event_source(fila, al_get_display_event_source(tela));
     al_register_event_source(fila, al_get_timer_event_source(timer));
@@ -243,12 +231,12 @@ int main(void) {
         if (redesenhar && al_is_event_queue_empty(fila)) {
             redesenhar = 0;
             desenharCenario(fundo);
-            desenharJogador(&jogador, sprites);
+            desenharJogador(&jogador, spritesheet);
             al_flip_display();
         }
     }
 
-    liberarSprites(sprites);
+    al_destroy_bitmap(spritesheet);
     al_destroy_bitmap(fundo);
     al_destroy_timer(timer);
     al_destroy_event_queue(fila);
