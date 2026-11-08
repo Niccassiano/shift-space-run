@@ -62,20 +62,34 @@ void desenharCenario(ALLEGRO_BITMAP *fundo) {
         0, 0, LARGURA_TELA, ALTURA_TELA, 0);
 }
 
-void desenharJogador(Jogador *j, ALLEGRO_BITMAP *sprites[3][3]) {
-    int linha = j->direcao;
-    int flags = 0;
+// o recorte e calculado pela linha e coluna 
+// sx = coluna × FRAME_LARG -> coluna e o frame 
+// sy = linha × FRAME_ALT -> linha e a direcao do personagem
 
-    // pega o png do personagem e inverte a posicao para a direita
+// ALLEGRO_BITMAP *spritesheet -> imagem do personagem
+// Linha Direcao
+// 0	frente
+// 1	esquerda
+// 2	costas
+
+// Se j->direcao for igual a 2, o allegro vai selecionar a linha 2
+void desenharJogador(Jogador *j, ALLEGRO_BITMAP *spritesheet) {
+    int linha = j->direcao;
+    int flags = 0; // qual transformacao ele deve aplicar na imagem antes de desenha la na tela
+    
+    // direita reaproveita a linha da esquerda, vira a imagem para a direita
     if (j->direcao == 3) {
         linha = 1;
         flags = ALLEGRO_FLIP_HORIZONTAL;
     }
 
-    al_draw_scaled_bitmap(sprites[linha][j->frame],
-        0, 0, FRAME_LARG, FRAME_ALT,
-        j->x - DESENHO_LARG / 2, j->y - DESENHO_ALT,
-        DESENHO_LARG, DESENHO_ALT, flags);
+    int recorteX = j->frame * FRAME_LARG;   // qual coluna que sera desenhada
+    int recorteY = linha * FRAME_ALT;       // qual linha que sera desenhada
+
+    al_draw_scaled_bitmap(spritesheet,
+        recorteX, recorteY, FRAME_LARG, FRAME_ALT,           // seleciona o recorte da imagem
+        j->x - DESENHO_LARG / 2, j->y - DESENHO_ALT,         // destino na tela, basicamente onde sera desenhado
+        DESENHO_LARG, DESENHO_ALT, flags); // tamanho do personagem na tela e flags para virar a imagem
 }
 
 
@@ -220,7 +234,7 @@ int main(void) {
         if (redesenhar && al_is_event_queue_empty(fila)) {
             redesenhar = 0;
             desenharCenario(fundo);
-            desenharJogador(&jogador, sprites);
+            desenharJogador(&jogador, spritesheet);
             al_flip_display();
         }
     }
