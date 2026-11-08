@@ -201,10 +201,12 @@ int main(void) {
     return 1;
     }
 
-    if (!carregarSprites(sprites)) {
-        liberarSprites(sprites);
-        return 1;
-    }
+    // removido carregarSprites e liberarSprites, pois nao ha mais necessidade de carregar 9 imagens separadas
+    // ja que agora temos 1 spritesheet
+    //if (!carregarSprites(sprites)) {
+    //    liberarSprites(sprites);
+    //    return 1;
+    //}
 
     al_register_event_source(fila, al_get_display_event_source(tela));
     al_register_event_source(fila, al_get_timer_event_source(timer));
@@ -239,7 +241,7 @@ int main(void) {
         }
     }
 
-    liberarSprites(sprites);
+    // liberarSprites(sprites);
     al_destroy_bitmap(spritesheet);
     al_destroy_bitmap(fundo);
     al_destroy_timer(timer);
