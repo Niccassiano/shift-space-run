@@ -173,32 +173,56 @@ int main(void) {
     ALLEGRO_KEYBOARD_STATE teclado;
 
     if (!al_init()) {
+        fprintf(stderr, "erro da funcao al_init()\n");
         return 1;
     }
     if (!al_init_image_addon()) {
+        fprintf(stderr, "erro da funcao al_init_image_addon()\n");
         return 1;
     }
     if (!al_install_keyboard()) {
+        fprintf(stderr, "erro da funcao al_install_keyboard()\n");
         return 1;
     }
 
     tela = al_create_display(LARGURA_TELA, ALTURA_TELA);
     timer = al_create_timer(1.0 / FPS);
     fila = al_create_event_queue();
-    if (tela == NULL || timer == NULL || fila == NULL) {
+    if (tela == NULL) {
+        fprintf(stderr, "erro da funcao al_create_display()\n");
+        return 1;
+    }
+    if (timer == NULL) {
+        fprintf(stderr, "erro da funcao al_create_timer()\n");
+        al_destroy_display(tela);
+        return 1;
+    }
+    if (fila == NULL) {
+        fprintf(stderr, "erro da funcao al_create_event_queue()\n");
+        al_destroy_timer(timer);
+        al_destroy_display(tela);
         return 1;
     }
     al_set_window_title(tela, "Shift Space Run");
 
     fundo = al_load_bitmap("assets/sala01_fundo.png");
     if (fundo == NULL) {
+        fprintf(stderr, "erro da funcao al_load_bitmap() para o fundo\n");
+        al_destroy_event_queue(fila);
+        al_destroy_timer(timer);
+        al_destroy_display(tela);
         return 1;
     }
 
     // pega spritesheet do personagem e faz ele andar 
     spritesheet = al_load_bitmap("sprites/prisioneiro.png");
     if (spritesheet == NULL) {
-    return 1;
+        fprintf(stderr, "erro da funcao al_load_bitmap() para o spritesheet\n");
+        al_destroy_bitmap(fundo);
+        al_destroy_event_queue(fila);
+        al_destroy_timer(timer);
+        al_destroy_display(tela);
+        return 1;
     }
 
     // removido carregarSprites e liberarSprites, pois nao ha mais necessidade de carregar 9 imagens separadas
