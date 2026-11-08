@@ -2,6 +2,8 @@
 #include <string.h>
 #include <allegro5/allegro.h>
 #include <allegro5/allegro_image.h>
+#include <allegro5/allegro_font.h>
+#include <allegro5/allegro_ttf.h>
 
 #define LARGURA_TELA 1280
 #define ALTURA_TELA  720
@@ -166,6 +168,8 @@ int main(void) {
     ALLEGRO_TIMER *timer = NULL;
     ALLEGRO_BITMAP *fundo = NULL;
     ALLEGRO_BITMAP *spritesheet = NULL; // troca 9 matriz por apenas 1 sprite sheet
+    ALLEGRO_FONT *fonte_titulo = NULL; 
+    ALLEGRO_FONT *fonte_descricao = NULL;
     Jogador jogador;
     int rodando = 1;
     int redesenhar = 1;
@@ -178,6 +182,14 @@ int main(void) {
     }
     if (!al_init_image_addon()) {
         fprintf(stderr, "erro da funcao al_init_image_addon()\n");
+        return 1;
+    }
+    if (!al_init_font_addon()) {
+        fprintf(stderr, "erro da funcao al_init_font_addon() -> fonte\n");
+        return 1;
+    }
+    if (!al_init_ttf_addon()) {
+        fprintf(stderr, "erro da funcao al_init_ttf_addon() -> fonte \n");
         return 1;
     }
     if (!al_install_keyboard()) {
@@ -225,6 +237,31 @@ int main(void) {
         return 1;
     }
 
+    // carrega a fonte do titulo
+    fonte_titulo = al_load_ttf_font("fonts/hermes-1943/HERMES 1943.ttf", 35, 0);
+    if (fonte_titulo == NULL) {
+        fprintf(stderr, "erro da funcao al_load_ttf_font() para a fonte do titulo\n");
+        al_destroy_bitmap(spritesheet);
+        al_destroy_bitmap(fundo);
+        al_destroy_event_queue(fila);
+        al_destroy_timer(timer);
+        al_destroy_display(tela);
+        return 1;
+    }
+
+    // carrega a fonte da descricao
+    fonte_descricao = al_load_ttf_font("fonts/courier_polski_1941/zai_CourierPolski1941.ttf", 25, 0);
+    if (fonte_descricao == NULL) {
+        fprintf(stderr, "erro da funcao al_load_ttf_font() para a fonte da descricao\n");
+        al_destroy_font(fonte_titulo);
+        al_destroy_bitmap(spritesheet);
+        al_destroy_bitmap(fundo);
+        al_destroy_event_queue(fila);
+        al_destroy_timer(timer);
+        al_destroy_display(tela);
+        return 1;
+    }
+
     // removido carregarSprites e liberarSprites, pois nao ha mais necessidade de carregar 9 imagens separadas
 
     al_register_event_source(fila, al_get_display_event_source(tela));
@@ -256,10 +293,17 @@ int main(void) {
             redesenhar = 0;
             desenharCenario(fundo);
             desenharJogador(&jogador, spritesheet);
+
+
+            // define tamanho da tela e posicao do texto e cores
+            al_draw_text(fonte_titulo, al_map_rgb(255, 255, 255), 30, 20, 0, "Shift Space Run");
+            al_draw_text(fonte_descricao, al_map_rgb(116, 26, 26), 30, 70, 0, "A segunda guerra mundial");
             al_flip_display();
         }
     }
 
+    al_destroy_font(fonte_descricao);
+    al_destroy_font(fonte_titulo);
     al_destroy_bitmap(spritesheet);
     al_destroy_bitmap(fundo);
     al_destroy_timer(timer);
