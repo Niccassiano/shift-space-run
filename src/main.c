@@ -55,8 +55,6 @@ void iniciarJogador(Jogador *j) {
 }
 // inicia com uma funcao que carrega o ponteiro do jogo e suas vidas, pontos e etc 
 
-// pega sprites do personagem e faz ele andar
-
 // desenhando o cenario e personagem
 void desenharCenario(ALLEGRO_BITMAP *fundo) {
     al_draw_scaled_bitmap(fundo,
@@ -182,6 +180,13 @@ int main(void) {
     if (fundo == NULL) {
         return 1;
     }
+
+    // pega spritesheet do personagem e faz ele andar 
+    spritesheet = al_load_bitmap("sprites/prisioneiro.png");
+    if (spritesheet == NULL) {
+    return 1;
+    }
+
     if (!carregarSprites(sprites)) {
         liberarSprites(sprites);
         return 1;
@@ -221,6 +226,7 @@ int main(void) {
     }
 
     liberarSprites(sprites);
+    al_destroy_bitmap(spritesheet);
     al_destroy_bitmap(fundo);
     al_destroy_timer(timer);
     al_destroy_event_queue(fila);
