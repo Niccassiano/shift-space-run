@@ -56,34 +56,6 @@ void iniciarJogador(Jogador *j) {
 // inicia com uma funcao que carrega o ponteiro do jogo e suas vidas, pontos e etc 
 
 // pega sprites do personagem e faz ele andar
-int carregarSprites(ALLEGRO_BITMAP *sprites[3][3]) {
-    char *nomes[3] = {"frente", "esquerda", "costas"};
-    char caminho[100];
-    int d, f;
-
-    for (d = 0; d < 3; d++) {
-        for (f = 0; f < 3; f++) {
-            sprintf(caminho, "sprites/prisioneiro_%s_%d.png", nomes[d], f);
-            sprites[d][f] = al_load_bitmap(caminho);
-            if (sprites[d][f] == NULL) {
-                return 0;
-            }
-        }
-    }
-    return 1;
-}
-
-void liberarSprites(ALLEGRO_BITMAP *sprites[3][3]) {
-    int d, f;
-
-    for (d = 0; d < 3; d++) {
-        for (f = 0; f < 3; f++) {
-            if (sprites[d][f] != NULL) {
-                al_destroy_bitmap(sprites[d][f]);
-            }
-        }
-    }
-}
 
 // desenhando o cenario e personagem
 void desenharCenario(ALLEGRO_BITMAP *fundo) {
@@ -181,7 +153,7 @@ int main(void) {
     ALLEGRO_EVENT_QUEUE *fila = NULL;
     ALLEGRO_TIMER *timer = NULL;
     ALLEGRO_BITMAP *fundo = NULL;
-    ALLEGRO_BITMAP *sprites[3][3] = {{NULL}};
+    ALLEGRO_BITMAP *spritesheet = NULL; // troca 9 matriz por apenas 1 sprite sheet
     Jogador jogador;
     int rodando = 1;
     int redesenhar = 1;
