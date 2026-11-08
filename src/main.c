@@ -4,6 +4,7 @@
 #include <allegro5/allegro_image.h>
 #include <allegro5/allegro_font.h>
 #include <allegro5/allegro_ttf.h>
+#include <allegro5/allegro_primitives.h>
 
 #define LARGURA_TELA 1280
 #define ALTURA_TELA  720
@@ -17,11 +18,30 @@
 #define DESENHO_LARG 72
 #define DESENHO_ALT  108
 
-/* fazer o personagem andar, definindo limites no chao  */
+// fazer o personagem andar, definindo limites no chao  
 #define LIMITE_ESQ 40
 #define LIMITE_DIR 1240
 #define LIMITE_CIMA 500
 #define LIMITE_BAIXO 700
+
+// tamanho do cenario, 10 salas, cada sala tem 1280x720
+#define TOTAL_SALAS 10
+// define quanto tempo o personagem ficara com o efeito visual de flash vermelho
+#define FLASH_DURACAO 20   // frames do flash vermelho (~0,33 s a 60 FPS)
+// o efeito visual de flash vermelho vai durar 20 frames -> 20/60 = 0,33 segundos que o personagem ficara com o efeito
+// 60 frames = 1 segundo
+// 30 frames = 0,5 segundo
+// 20 frames = aproximadamente 0,33 segundo
+// 10 frames = aproximadamente 0,16 segundo
+
+// ele aciona um contador de framer
+// início	20
+// 1ª	19
+// 2ª	18
+// 3ª	17
+// 10ª	10
+// 19ª	1
+// 20ª	0 -> quando chega a zero, o efeito termina.
 
 // registro de cada jogador 
 typedef struct {
