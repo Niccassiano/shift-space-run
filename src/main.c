@@ -86,8 +86,7 @@ typedef struct {
     char explicacao[320];
 } Objeto;
 
-// o cartaz esta na parede, se o y do objeto e menor que 500, o jogador nao consegue interagir com ele, pois esta muito longe do chao 
-// entao o x e o do cartaz e o y e 500, para que o jogador consiga interagir com ele, mesmo que o cartaz esteja na parede, pois o personagem esta no chao
+// cartazes ficam nas paredes, mas o ponto de interacao fica no chao: y=560 ou y=650, dentro da faixa 500 a 700
 typedef struct {
     int estado;
     Objeto objetos[MAX_OBJETOS];
@@ -292,9 +291,9 @@ void desenharIdentidade(ALLEGRO_FONT *fonte_titulo, ALLEGRO_FONT *fonte_descrica
 
     // reserva uma area propria para o titulo
     al_draw_filled_rounded_rectangle(174, 9, 1106, 96, 12, 12,
-                                     al_map_rgba(9, 12, 16, 225));
+            al_map_rgba(9, 12, 16, 225));
     al_draw_rounded_rectangle(174, 9, 1106, 96, 12, 12,
-                              al_map_rgba(210, 190, 150, 170), 1);
+            al_map_rgba(210, 190, 150, 170), 1);
 
     // logo com sombra e destaque no SPACE
     al_draw_text(fonte_titulo, al_map_rgba(0, 0, 0, 220), inicio + 2, 15, 0, nome);
@@ -379,7 +378,7 @@ void iniciarSala1(Sala1 *s) {
     adicionarObjeto(s, OBJ_FRAGMENTO, 330, 560, 0, "Cartaz do partido (sem data)",
         "'O POVO ALEMÃO ESCOLHEU O SEU LÍDER! Hitler venceu as eleições com a maioria dos votos.'",
         "Nas eleições de 1932 e 1933 o partido não teve a maioria dos votos, e Hitler assumiu por nomeação. Repare: o cartaz não cita data nem documento.");
-    adicionarObjeto(s, OBJ_FRAGMENTO, 615, 650, 0, "Nota oficial (sem fonte)",
+    adicionarObjeto(s, OBJ_FRAGMENTO, 700, 650, 0, "Nota oficial (sem fonte)",
         "A imprensa alemã continua livre. Cada jornal publica o que quiser, sem ordens do governo.",
         "O Ministério da Propaganda mandava instruções diárias aos jornais sobre o que publicar e o que calar. Jornais de oposição foram fechados.");
     adicionarObjeto(s, OBJ_FRAGMENTO, 710, 560, 0, "Nota oficial (sem fonte)",
@@ -486,20 +485,79 @@ void desenharIcone(Jogador *j, Sala1 *s, ALLEGRO_FONT *fonte) {
     }
 }
 // funcao de desenhar caixa de texto do cartaz que o jogador esta lendo, com o texto do cartaz
-void desenharCaixaTexto(Sala1 *s, ALLEGRO_FONT *fonte) {
-    if (s->estado != ESTADO_LENDO) return;
+// painel de leitura, escolha e resultado (fica na parte de baixo da tela)
+void desenharPainel(Sala1 *s, ALLEGRO_FONT *fonte) {
+    Objeto *o;
+    ALLEGRO_COLOR bege = al_map_rgb(238, 224, 196);
+    ALLEGRO_COLOR dourado = al_map_rgb(210, 190, 150);
+    ALLEGRO_COLOR cinza = al_map_rgb(150, 145, 135);
 
-    // caixa na parte de baixo da tela, para nao atrapalhar o personagem, com o texto do cartaz que o jogador esta lendo
-    al_draw_filled_rectangle(100, 540, LARGURA_TELA - 100, 690, al_map_rgb(15, 15, 15));
-    al_draw_rectangle(100, 540, LARGURA_TELA - 100, 690, al_map_rgb(230, 230, 230), 3);
+    if (s->estado == ESTADO_JOGANDO) return;
+    o = &s->objetos[s->objetoAtivo];
 
-    al_draw_multiline_text(fonte, al_map_rgb(230, 230, 230),
-            125, 560, LARGURA_TELA - 250, 28, 0,
-            s->objetos[s->objetoAtivo].texto);
+    // mesmo layout do HUD
+    al_draw_filled_rounded_rectangle(80, 450, LARGURA_TELA - 80, 695, 12, 12,
+        al_map_rgba(9, 12, 16, 235));
+    al_draw_rounded_rectangle(80, 450, LARGURA_TELA - 80, 695, 12, 12,
+        al_map_rgba(210, 190, 150, 170), 1);
+    al_draw_text(fonte, dourado, 105, 467, 0, o->titulo);
 
-    al_draw_text(fonte, al_map_rgb(150, 150, 150),
-            LARGURA_TELA - 125, 660, ALLEGRO_ALIGN_RIGHT,
+    // resultado da escolha, se acertou ou errou, e explicacao do fragmento
+    if (s->estado == ESTADO_RESULTADO) {
+        if (s->acertouUltimo) {
+            al_draw_text(fonte, al_map_rgb(120, 170, 100), 105, 505, 0, "CORRETO");
+        } else {
+            al_draw_text(fonte, al_map_rgb(200, 60, 50), 105, 505, 0, "ERRADO  (-1 vida)");
+        }
+        al_draw_multiline_text(fonte, bege, 105, 541, LARGURA_TELA - 210, 26, 0,
+            o->explicacao);
+        if (s->reiniciar) {
+            al_draw_text(fonte, al_map_rgb(200, 60, 50), 105, 630, 0,
+            "Suas vidas acabaram. A sala será reiniciada.");
+        }
+        al_draw_text(fonte, cinza, LARGURA_TELA - 105, 668, ALLEGRO_ALIGN_RIGHT,
+            "[ESPAÇO] continuar");
+        return;
+    }
+
+    // lendo ou escolhendo, exibe o texto do cartaz ou fragmento
+    al_draw_multiline_text(fonte, bege, 105, 505, LARGURA_TELA - 210, 26, 0, o->texto);
+
+    if (s->estado == ESTADO_ESCOLHA) {
+        // destaca a opcao selecionada
+        if (s->opcao == 0) {
+            al_draw_filled_rounded_rectangle(105, 625, 265, 660, 6, 6,
+                al_map_rgb(60, 105, 55));
+        } else {
+            al_draw_filled_rounded_rectangle(290, 625, 490, 660, 6, 6,
+                al_map_rgb(135, 38, 32));
+        }
+        al_draw_text(fonte, bege, 185, 634, ALLEGRO_ALIGN_CENTER, "FATO");
+        al_draw_text(fonte, bege, 390, 634, ALLEGRO_ALIGN_CENTER, "PROPAGANDA");
+        al_draw_text(fonte, cinza, LARGURA_TELA - 105, 634, ALLEGRO_ALIGN_RIGHT,
+            "SETAS escolhem | [ESPAÇO] confirma");
+    } else {
+        if (o->tipo == OBJ_FRAGMENTO && !o->resolvido) {
+            al_draw_text(fonte, cinza, LARGURA_TELA - 105, 668, ALLEGRO_ALIGN_RIGHT,
+            "[ESPAÇO] analisar este documento");
+        } else {
+            al_draw_text(fonte, cinza, LARGURA_TELA - 105, 668, ALLEGRO_ALIGN_RIGHT,
             "[ESPAÇO] fechar");
+        }
+    }
+}
+
+// cartao de progresso logo abaixo do header PROVAS 1/3
+void desenharProgresso(Sala1 *s, ALLEGRO_FONT *fonte) {
+    int a = s->acertos;
+    if (a > ACERTOS_NECESSARIOS) a = ACERTOS_NECESSARIOS;
+
+    al_draw_filled_rounded_rectangle(540, 104, 740, 136, 8, 8,
+                                     al_map_rgba(9, 12, 16, 220));
+    al_draw_rounded_rectangle(540, 104, 740, 136, 8, 8,
+                              al_map_rgba(210, 190, 150, 150), 1);
+    al_draw_textf(fonte, al_map_rgb(238, 224, 196), LARGURA_TELA / 2, 112,
+                  ALLEGRO_ALIGN_CENTER, "PROVAS %d/%d", a, ACERTOS_NECESSARIOS);
 }
 
 // main 
@@ -641,13 +699,21 @@ int main(void) {
         if (evento.type == ALLEGRO_EVENT_DISPLAY_CLOSE) {
             rodando = 0;
         }
-        if (evento.type == ALLEGRO_EVENT_KEY_DOWN &&
-            evento.keyboard.keycode == ALLEGRO_KEY_ESCAPE) {
-            rodando = 0;
-        }
-        if (evento.type == ALLEGRO_EVENT_KEY_DOWN &&
-            evento.keyboard.keycode == ALLEGRO_KEY_SPACE) {
-            interagir(&sala, &jogador);
+        if (evento.type == ALLEGRO_EVENT_KEY_DOWN) {
+            int tecla = evento.keyboard.keycode;
+
+            if (tecla == ALLEGRO_KEY_ESCAPE) {
+                rodando = 0;
+            }
+            if (tecla == ALLEGRO_KEY_SPACE) {
+                interagir(&sala, &jogador);
+            }
+            if (tecla == ALLEGRO_KEY_LEFT || tecla == ALLEGRO_KEY_A) {
+                escolherOpcao(&sala, 0);    // FATO
+            }
+            if (tecla == ALLEGRO_KEY_RIGHT || tecla == ALLEGRO_KEY_D) {
+                escolherOpcao(&sala, 1);    // PROPAGANDA
+            }
         }
         if (evento.type == ALLEGRO_EVENT_TIMER) {
             sala.tempo++;
@@ -667,7 +733,8 @@ int main(void) {
             desenharJogador(&jogador, spritesheet);
             desenharIcone(&jogador, &sala, fonte);
             desenharHUD(&jogador, fonte);
-            desenharCaixaTexto(&sala, fonte);
+            desenharProgresso(&sala, fonte);
+            desenharPainel(&sala, fonte);
             desenharIdentidade(fonte_titulo, fonte_descricao);
             desenharFlash(&jogador);
             al_flip_display();
