@@ -5,6 +5,8 @@
 #include <allegro5/allegro_font.h>
 #include <allegro5/allegro_ttf.h>
 #include <allegro5/allegro_primitives.h>
+#include <allegro5/allegro_audio.h>
+#include <allegro5/allegro_acodec.h>
 
 #define LARGURA_TELA 1280
 #define ALTURA_TELA  720
@@ -43,7 +45,7 @@
 // 19ª	1
 // 20ª	0 -> quando chega a zero, o efeito termina.   
 
-#define MAX_OBJETOS 12 // quantidade maxima de objetos que o jogador pode interagir na sala 01
+#define MAX_OBJETOS 14     // quantidade maxima de objetos que o jogador pode interagir na sala 01
 #define RAIO_INTERACAO 60 // distancia para poder interagir
 #define ACERTOS_NECESSARIOS 3 // quantidade de acertos necessarios para passar de sala
 
@@ -54,6 +56,33 @@
 
 #define OBJ_CARTAZ    0 // cartaz que o jogador pode interagir e ler
 #define OBJ_FRAGMENTO 1 // fragmento que o jogador pode pegar para ganhar pontos
+
+#define ESTADO_PROVA     4        // pergunta final no pulpito
+#define ESTADO_CARD      5        // cartao "Voce sabia?"
+#define ESTADO_PORTA     6        // som da porta mais tela escurecendo
+#define ESTADO_CONCLUIDA 7        // fim da sala 1
+
+#define OBJ_PODIO 2               // pulpito (prova final)
+
+#define TOTAL_OPCOES_PROVA 3
+#define OPCAO_CORRETA_PROVA 1     // indice da resposta certa (GABARITO A SEGUNDA E A CORRETA)
+#define PORTA_DURACAO 180         // frames da transicao (3 segundos a 60 FPS)
+
+// cria uma variavel global para a pergunta final e as opcoes de resposta, para que o jogador possa interagir com o pulpito e responder a pergunta final
+static const char *PERGUNTA_FINAL =
+    "Em 1935, as Leis de Nuremberg foram anunciadas. O que elas fizeram?";
+
+static const char *OPCOES_FINAL[TOTAL_OPCOES_PROVA] = {
+    "Garantiram os mesmos direitos a todos os alemães.",
+    "Tiraram a cidadania dos judeus alemães e criaram regras de exclusão.",
+    "Marcaram o início da guerra contra a Polônia."
+};
+
+static const char *CARD_TEXTO =
+    "Em 1935, as Leis de Nuremberg tiraram a cidadania dos judeus alemães. "
+    "Um decreto do mesmo ano definiu, por ascendência, quem seria tratado como judeu. "
+    "A exclusão virou lei quatro anos antes de a guerra começar.";
+
 
 // registro de cada jogador 
 typedef struct {
@@ -100,6 +129,7 @@ typedef struct {
     int opcao;           // 0 = FATO, 1 = PROPAGANDA
     int acertouUltimo;
     int reiniciar;       // 1 se a ultima resposta zerou as vidas
+    int tempoPorta;      // frames desde que a porta comecou a abrir
 } Sala1;
 
 // parei passo 3 Cadastro dos objetos
@@ -344,6 +374,7 @@ void iniciarSala1(Sala1 *s) {
     s->opcao = 0;
     s->acertouUltimo = 0;
     s->reiniciar = 0;
+    s->tempoPorta = 0;
 
 
     // CARTAZ PARA ELE CONSEGUIR ESTUDAR E PEGAR OS FRAGMENTOS, COM O TEXTO DE PROPAGANDA DO PARTIDO
@@ -384,6 +415,12 @@ void iniciarSala1(Sala1 *s) {
     adicionarObjeto(s, OBJ_FRAGMENTO, 710, 560, 0, "Nota oficial (sem fonte)",
         "As Leis de Nuremberg protegem todos os alemães e garantem os mesmos direitos a cada cidadão.",
         "A lei fez o contrário: tirou a cidadania dos judeus e proibiu casamentos entre judeus e outros alemães. Propaganda costuma dar nome bonito ao que exclui.");
+
+    // jogador responde a pergunta final no pulpito, com base nos fragmentos que ele leu e pegou, so quando ele tiver 3/3
+    adicionarObjeto(s, OBJ_PODIO, 640, 505, 0, "Púlpito",
+        "O púlpito está fechado. Antes de subir, prove que sabe separar fato de propaganda: examine os documentos da sala.",
+        "Releia os documentos. Pista: o que dizia a Lei da Cidadania do Reich, de 1935? E a nota oficial que prometia 'direitos iguais'?");
+
 }
 // 300, 560
 // 750, 560
@@ -433,6 +470,26 @@ void confirmarEscolha(Sala1 *s, Jogador *j) {
         s->reiniciar = perderVida(j);
     }
     s->estado = ESTADO_RESULTADO;
+}
+
+// setas cima/baixo trocam a alternativa da pergunta final para o jogador escolher, e a funcao mudarOpcaoProva eh chamada a cada aperto de tecla para mudar a opcao selecionada
+void mudarOpcaoProva(Sala1 *s, int passo) {
+    if (s->estado != ESTADO_PROVA) return;
+    s->opcao = s->opcao + passo;
+    if (s->opcao < 0) s->opcao = TOTAL_OPCOES_PROVA - 1;
+    if (s->opcao >= TOTAL_OPCOES_PROVA) s->opcao = 0;
+}
+
+// confere a resposta da pergunta final 
+void confirmarProva(Sala1 *s, Jogador *j) {
+    if (s->opcao == OPCAO_CORRETA_PROVA) {
+        s->estado = ESTADO_CARD;
+    } else {
+        s->acertouUltimo = 0;
+        s->vidasPerdidas++;
+        s->reiniciar = perderVida(j);
+        s->estado = ESTADO_RESULTADO;   // mostra  ERRADO mais a dica do pulpito
+    }
 }
 
 // chamada UMA vez a cada aperto da tecla ESPACO, para interagir com o objeto mais proximo do jogador, ou fechar a caixa de texto, ou confirmar a escolha
