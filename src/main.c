@@ -41,13 +41,19 @@
 // 3ª	17
 // 10ª	10
 // 19ª	1
-// 20ª	0 -> quando chega a zero, o efeito termina.
+// 20ª	0 -> quando chega a zero, o efeito termina.   
 
-#define MAX_OBJETOS 12
-#define RAIO_INTERACAO 70   // distancia para poder interagir
+#define MAX_OBJETOS 12 // quantidade maxima de objetos que o jogador pode interagir na sala 01
+#define RAIO_INTERACAO 60 // distancia para poder interagir
+#define ACERTOS_NECESSARIOS 3 // quantidade de acertos necessarios para passar de sala
 
-#define ESTADO_JOGANDO 0    // andando 
-#define ESTADO_LENDO   1    // caixa de texto aberta, personagem parado
+#define ESTADO_JOGANDO   0 // andando 
+#define ESTADO_LENDO     1 // caixa de texto aberta, personagem parado
+#define ESTADO_ESCOLHA   2 // escolhendo uma opcao
+#define ESTADO_RESULTADO 3 // resultado da escolha
+
+#define OBJ_CARTAZ    0 // cartaz que o jogador pode interagir e ler
+#define OBJ_FRAGMENTO 1 // fragmento que o jogador pode pegar para ganhar pontos
 
 // registro de cada jogador 
 typedef struct {
@@ -71,22 +77,30 @@ typedef struct {
 
 // objeto que o jogador pode interagir, ler e pegar pontos
 typedef struct {
-    float x, y;          // ponto de interação NO CHAO (faixa y 500 a 700)
-    float raio;
-    char texto[200];
-    int examinado;       // 1 se ja foi lido
+    int tipo;            // OBJ_CARTAZ ou OBJ_FRAGMENTO
+    float x, y, raio;    // ponto de interacao
+    int verdadeiro;      // fragmento verdadeiro ou falso
+    int resolvido;       // fragmento ja foi resolvido, para nao contar pontos varias vezes
+    char titulo[48];
+    char texto[320];
+    char explicacao[320];
 } Objeto;
 
 // o cartaz esta na parede, se o y do objeto e menor que 500, o jogador nao consegue interagir com ele, pois esta muito longe do chao 
 // entao o x e o do cartaz e o y e 500, para que o jogador consiga interagir com ele, mesmo que o cartaz esteja na parede, pois o personagem esta no chao
 typedef struct {
     int estado;
-// o estado e o que impede o personagem de andar enquanto esta lendo um cartaz
     Objeto objetos[MAX_OBJETOS];
+// o estado e o que impede o personagem de andar enquanto esta lendo um cartaz
     int qtdObjetos;
-    int objetoAtivo;     // objeto sendo lido, -1 se nenhum
+    int objetoAtivo;     // -1 se nenhum, objeto sendo lido
     // objetoAtivo e o indice do cartaz que o jogador esta lendo, para que o texto do cartaz seja exibido na tela
     int tempo;           // conta frames, para fechar
+    int acertos;
+    int vidasPerdidas;   // vai servir para a pontuacao final, caso o jogador perca vidas, ele nao ganha pontos
+    int opcao;           // 0 = FATO, 1 = PROPAGANDA
+    int acertouUltimo;
+    int reiniciar;       // 1 se a ultima resposta zerou as vidas
 } Sala1;
 
 void iniciarJogador(Jogador *j) {
@@ -222,14 +236,16 @@ void reiniciarSala(Jogador *j) {
 }
 
 // erro ou deteccao custa 1 vida, com flash vermelho
-void perderVida(Jogador *j) {
+// devolve 1 se as vidas acabaram e a sala foi reiniciada
+int perderVida(Jogador *j) {
     j->vidas--;
     j->flash = FLASH_DURACAO;
 
-    // zerou as vidas, volta ao início da sala com 3 vidas
     if (j->vidas <= 0) {
         reiniciarSala(j);
+        return 1;
     }
+    return 0; // 0 caso contrario
 }
 
 void desenharHUD(Jogador *j, ALLEGRO_FONT *fonte) {
