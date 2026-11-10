@@ -206,6 +206,73 @@ void perderVida(Jogador *j) {
     }
 }
 
+void desenharHUD(Jogador *j, ALLEGRO_FONT *fonte) {
+    int i;
+
+    // cartao de vidas no canto superior esquerdo seperando o header
+    al_draw_filled_rounded_rectangle(18, 12, 158, 82, 10, 10,
+        al_map_rgba(9, 12, 16, 220));
+    al_draw_rounded_rectangle(18, 12, 158, 82, 10, 10,
+        al_map_rgba(210, 190, 150, 150), 1);
+    al_draw_text(fonte, al_map_rgb(210, 190, 150), 31, 17, 0, "VIDAS");
+
+    // cheio = vida restantes, apenas contorno -> vida perdida
+    for (i = 0; i < 3; i++) {
+        float cx = 43 + i * 42;
+        float cy = 58;
+        if (i < j->vidas) {
+            al_draw_filled_circle(cx, cy, 9, al_map_rgb(185, 42, 35));
+        }
+        al_draw_circle(cx, cy, 9, al_map_rgb(238, 224, 196), 2);
+    }
+
+    // identificador da sala no canto superior direito
+    al_draw_filled_rounded_rectangle(1121, 12, 1262, 82, 10, 10,
+            al_map_rgba(9, 12, 16, 220));
+    al_draw_rounded_rectangle(1121, 12, 1262, 82, 10, 10,
+            al_map_rgba(210, 190, 150, 150), 1);
+    al_draw_textf(fonte, al_map_rgb(238, 224, 196),
+            1250, 31, ALLEGRO_ALIGN_RIGHT,
+            "%d/%d", j->sala, TOTAL_SALAS);
+}
+
+// header do jogo, com o nome do jogo e a frase de destaque
+void desenharIdentidade(ALLEGRO_FONT *fonte_titulo, ALLEGRO_FONT *fonte_descricao) {
+    const char *nome = "SHIFT SPACE RUN";
+    const char *destaque = "SPACE";
+    const char *prefixo = "SHIFT ";
+    const char *frase = "INFILTRE-SE  /  COLETE FRAGMENTOS  /  DESCUBRA A HISTÓRIA";
+    int larguraNome = al_get_text_width(fonte_titulo, nome);
+    int larguraPrefixo = al_get_text_width(fonte_titulo, prefixo);
+    float inicio = (LARGURA_TELA - larguraNome) / 2.0f;
+
+    // reserva uma area propria para o titulo
+    al_draw_filled_rounded_rectangle(174, 9, 1106, 96, 12, 12,
+                                     al_map_rgba(9, 12, 16, 225));
+    al_draw_rounded_rectangle(174, 9, 1106, 96, 12, 12,
+                              al_map_rgba(210, 190, 150, 170), 1);
+
+    // logo com sombra e destaque no SPACE
+    al_draw_text(fonte_titulo, al_map_rgba(0, 0, 0, 220), inicio + 2, 15, 0, nome);
+    al_draw_text(fonte_titulo, al_map_rgb(244, 232, 207), inicio, 13, 0, nome);
+    al_draw_text(fonte_titulo, al_map_rgb(190, 45, 37),
+                 inicio + larguraPrefixo, 13, 0, destaque);
+    al_draw_text(fonte_descricao, al_map_rgb(220, 202, 166),
+                 LARGURA_TELA / 2, 62, ALLEGRO_ALIGN_CENTRE, frase);
+    al_draw_filled_rectangle(516, 89, 764, 91, al_map_rgb(166, 42, 34));
+}
+
+// flash vermelho por cima de tudo
+void desenharFlash(Jogador *j) {
+    if (j->flash > 0) {
+        // vai diminuindo conforme o flash acaba 
+        int alfa = (j->flash * 140) / FLASH_DURACAO;
+        al_draw_filled_rectangle(0, 0, LARGURA_TELA, ALTURA_TELA,
+                                 al_map_rgba(180, 0, 0, alfa));
+        j->flash--;
+    }
+}
+
 
 // main 
 
@@ -215,6 +282,7 @@ int main(void) {
     ALLEGRO_TIMER *timer = NULL;
     ALLEGRO_BITMAP *fundo = NULL;
     ALLEGRO_BITMAP *spritesheet = NULL; // troca 9 matriz por apenas 1 sprite sheet
+    ALLEGRO_FONT *fonte = NULL;
     ALLEGRO_FONT *fonte_titulo = NULL; 
     ALLEGRO_FONT *fonte_descricao = NULL;
     Jogador jogador;
@@ -229,6 +297,10 @@ int main(void) {
     }
     if (!al_init_image_addon()) {
         fprintf(stderr, "erro da funcao al_init_image_addon()\n");
+        return 1;
+    }
+    if (!al_init_primitives_addon()) {
+        fprintf(stderr, "erro da funcao al_init_primitives_addon()\n");
         return 1;
     }
     if (!al_init_font_addon()) {
@@ -285,7 +357,7 @@ int main(void) {
     }
 
     // carrega a fonte do titulo
-    fonte_titulo = al_load_ttf_font("fonts/hermes-1943/HERMES 1943.ttf", 35, 0);
+    fonte_titulo = al_load_ttf_font("fonts/hermes-1943/HERMES 1943.ttf", 40, 0);
     if (fonte_titulo == NULL) {
         fprintf(stderr, "erro da funcao al_load_ttf_font() para a fonte do titulo\n");
         al_destroy_bitmap(spritesheet);
@@ -297,9 +369,23 @@ int main(void) {
     }
 
     // carrega a fonte da descricao
-    fonte_descricao = al_load_ttf_font("fonts/courier_polski_1941/zai_CourierPolski1941.ttf", 25, 0);
+    fonte_descricao = al_load_ttf_font("fonts/courier_polski_1941/zai_CourierPolski1941.ttf", 18, 0);
     if (fonte_descricao == NULL) {
         fprintf(stderr, "erro da funcao al_load_ttf_font() para a fonte da descricao\n");
+        al_destroy_font(fonte_titulo);
+        al_destroy_bitmap(spritesheet);
+        al_destroy_bitmap(fundo);
+        al_destroy_event_queue(fila);
+        al_destroy_timer(timer);
+        al_destroy_display(tela);
+        return 1;
+    }
+
+    // carrega a fonte usada pelo HUD (vidas e sala)
+    fonte = al_load_ttf_font("fonts/courier_polski_1941/zai_CourierPolski1941.ttf", 20, 0);
+    if (fonte == NULL) {
+        fprintf(stderr, "erro da funcao al_load_ttf_font() para a fonte do HUD\n");
+        al_destroy_font(fonte_descricao);
         al_destroy_font(fonte_titulo);
         al_destroy_bitmap(spritesheet);
         al_destroy_bitmap(fundo);
@@ -340,15 +426,19 @@ int main(void) {
             redesenhar = 0;
             desenharCenario(fundo);
             desenharJogador(&jogador, spritesheet);
-
-
-            // define tamanho da tela e posicao do texto e cores
-            al_draw_text(fonte_titulo, al_map_rgb(255, 255, 255), 30, 20, 0, "Shift Space Run");
-            al_draw_text(fonte_descricao, al_map_rgb(116, 26, 26), 30, 70, 0, "A segunda guerra mundial");
+            desenharFlash(&jogador);
+            desenharHUD(&jogador, fonte);
+            desenharIdentidade(fonte_titulo, fonte_descricao);
             al_flip_display();
+        }
+            // REMOVER DEPOIS
+            if (evento.type == ALLEGRO_EVENT_KEY_DOWN &&
+            evento.keyboard.keycode == ALLEGRO_KEY_V) {
+            perderVida(&jogador);   // perde 1 vida ao apertar a tecla V para teste do flash vermelho APENAS PARA TESTES
         }
     }
 
+    al_destroy_font(fonte);
     al_destroy_font(fonte_descricao);
     al_destroy_font(fonte_titulo);
     al_destroy_bitmap(spritesheet);
