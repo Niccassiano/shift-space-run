@@ -43,6 +43,12 @@
 // 19ª	1
 // 20ª	0 -> quando chega a zero, o efeito termina.
 
+#define MAX_OBJETOS 12
+#define RAIO_INTERACAO 70   // distancia para poder interagir
+
+#define ESTADO_JOGANDO 0    // andando 
+#define ESTADO_LENDO   1    // caixa de texto aberta, personagem parado
+
 // registro de cada jogador 
 typedef struct {
     char nome[30];
@@ -62,6 +68,24 @@ typedef struct {
     // efeito visual, contador de frames restantes do flash vermelho 
     int flash;       
 } Jogador;
+
+// objeto que o jogador pode interagir, ler e pegar pontos
+typedef struct {
+    float x, y;          // ponto de interação NO CHAO (faixa y 500 a 700)
+    float raio;
+    char texto[200];
+    int examinado;       // 1 se ja foi lido
+} Objeto;
+
+// o cartaz esta na parede, se o y do objeto e menor que 500, o jogador nao consegue interagir com ele, pois esta muito longe do chao 
+// entao o x e o do cartaz e o y e 500, para que o jogador consiga interagir com ele, mesmo que o cartaz esteja na parede, pois o personagem esta no chao
+typedef struct {
+    int estado;
+    Objeto objetos[MAX_OBJETOS];
+    int qtdObjetos;
+    int objetoAtivo;     // objeto sendo lido, -1 se nenhum
+    int tempo;           // conta frames, para fechar
+} Sala1;
 
 void iniciarJogador(Jogador *j) {
     strcpy(j->nome, "Prisioneiro");
