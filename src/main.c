@@ -81,9 +81,11 @@ typedef struct {
 // entao o x e o do cartaz e o y e 500, para que o jogador consiga interagir com ele, mesmo que o cartaz esteja na parede, pois o personagem esta no chao
 typedef struct {
     int estado;
+// o estado e o que impede o personagem de andar enquanto esta lendo um cartaz
     Objeto objetos[MAX_OBJETOS];
     int qtdObjetos;
     int objetoAtivo;     // objeto sendo lido, -1 se nenhum
+    // objetoAtivo e o indice do cartaz que o jogador esta lendo, para que o texto do cartaz seja exibido na tela
     int tempo;           // conta frames, para fechar
 } Sala1;
 
@@ -316,12 +318,16 @@ void iniciarSala1(Sala1 *s) {
 
     // adicionando cartazes na sala 01, com posicao x e y e o texto que sera exibido quando o jogador interagir com ele
     adicionarObjeto(s, 300, 560, "Cartaz Guerra");
-    adicionarObjeto(s, 640, 560, "Cartaz Bombas");
-    adicionarObjeto(s, 980, 560, "Cartaz Prisioneiro");
+    adicionarObjeto(s, 750, 560, "Cartaz Bombas");
+    adicionarObjeto(s, 1200, 560, "Cartaz Prisioneiro");
+    // trocar lugar de cada objeto 
 }
 
-// devolve o indice do objeto perto do jogador, ou -1 se nao tem nenhum
+// devolve o indice do objeto perto do jogador, ou -1 se nao tem nenhum -> ver IndiceObjeto.txt
 int objetoProximo(Jogador *j, Sala1 *s) {
+    // os objetos ficam num vetor de struct, e objetoProximo percorre esse vetor com um for, 
+    // verificando a distancia do jogador para cada objeto, e se a distancia for menor que o raio de interacao do objeto, 
+    // entao o jogador esta perto do objeto e pode interagir com ele
     int i;
     for (i = 0; i < s->qtdObjetos; i++) {
         float dx = j->x - s->objetos[i].x;
@@ -348,6 +354,37 @@ void interagir(Sala1 *s, Jogador *j) {
     }
 }
 
+// funcao de "ESPACO" piscando quando tiver um objeto por perto
+void desenharIcone(Jogador *j, Sala1 *s, ALLEGRO_FONT *fonte) {
+    if (s->estado != ESTADO_JOGANDO) return;
+    if (objetoProximo(j, s) == -1) return;
+
+    // pisca para o jogador clicar na tecla ESPACO
+    if ((s->tempo / 30) % 2 == 0) {
+        float x = j->x;
+        float y = j->y - DESENHO_ALT - 40;
+        al_draw_filled_rectangle(x - 45, y, x + 45, y + 28, al_map_rgb(20, 20, 20));
+        al_draw_rectangle(x - 45, y, x + 45, y + 28, al_map_rgb(230, 230, 230), 2);
+        al_draw_text(fonte, al_map_rgb(230, 230, 230), x, y + 4,
+                     ALLEGRO_ALIGN_CENTER, "ESPAÇO");
+    }
+}
+// funcao de desenhar caixa de texto do cartaz que o jogador esta lendo, com o texto do cartaz
+void desenharCaixaTexto(Sala1 *s, ALLEGRO_FONT *fonte) {
+    if (s->estado != ESTADO_LENDO) return;
+
+    // caixa na parte de baixo da tela, para nao atrapalhar o personagem, com o texto do cartaz que o jogador esta lendo
+    al_draw_filled_rectangle(100, 540, LARGURA_TELA - 100, 690, al_map_rgb(15, 15, 15));
+    al_draw_rectangle(100, 540, LARGURA_TELA - 100, 690, al_map_rgb(230, 230, 230), 3);
+
+    al_draw_multiline_text(fonte, al_map_rgb(230, 230, 230),
+            125, 560, LARGURA_TELA - 250, 28, 0,
+            s->objetos[s->objetoAtivo].texto);
+
+    al_draw_text(fonte, al_map_rgb(150, 150, 150),
+            LARGURA_TELA - 125, 660, ALLEGRO_ALIGN_RIGHT,
+            "[ESPAÇO] fechar");
+}
 
 // main 
 
@@ -361,6 +398,7 @@ int main(void) {
     ALLEGRO_FONT *fonte_titulo = NULL; 
     ALLEGRO_FONT *fonte_descricao = NULL;
     Jogador jogador;
+    Sala1 sala;
     int rodando = 1;
     int redesenhar = 1;
     // utilizando a biblioteca allegro para pegar o estado do teclado
@@ -477,6 +515,7 @@ int main(void) {
     al_register_event_source(fila, al_get_keyboard_event_source());
 
     iniciarJogador(&jogador);
+    iniciarSala1(&sala);
     al_start_timer(timer);
 
     while (rodando) {
@@ -490,10 +529,19 @@ int main(void) {
             evento.keyboard.keycode == ALLEGRO_KEY_ESCAPE) {
             rodando = 0;
         }
+        if (evento.type == ALLEGRO_EVENT_KEY_DOWN &&
+            evento.keyboard.keycode == ALLEGRO_KEY_SPACE) {
+            interagir(&sala, &jogador);
+        }
         if (evento.type == ALLEGRO_EVENT_TIMER) {
-            al_get_keyboard_state(&teclado);
-            // faz o personagem andar de acordo com a tecla pressionada
-            moverJogador(&jogador, &teclado);
+            sala.tempo++;
+            if (sala.estado == ESTADO_JOGANDO) {
+                al_get_keyboard_state(&teclado);
+                // faz o personagem andar de acordo com a tecla pressionada
+                moverJogador(&jogador, &teclado);
+            } else {
+                jogador.frame = 0;
+            }
             redesenhar = 1;
         }
 
@@ -501,15 +549,12 @@ int main(void) {
             redesenhar = 0;
             desenharCenario(fundo);
             desenharJogador(&jogador, spritesheet);
-            desenharFlash(&jogador);
+            desenharIcone(&jogador, &sala, fonte);
             desenharHUD(&jogador, fonte);
+            desenharCaixaTexto(&sala, fonte);
             desenharIdentidade(fonte_titulo, fonte_descricao);
+            desenharFlash(&jogador);
             al_flip_display();
-        }
-            // REMOVER DEPOIS
-            if (evento.type == ALLEGRO_EVENT_KEY_DOWN &&
-            evento.keyboard.keycode == ALLEGRO_KEY_V) {
-            perderVida(&jogador);   // perde 1 vida ao apertar a tecla V para teste do flash vermelho APENAS PARA TESTES
         }
     }
 
