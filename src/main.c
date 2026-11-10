@@ -498,7 +498,13 @@ void interagir(Sala1 *s, Jogador *j) {
         int i = objetoProximo(j, s);
         if (i != -1) {
             s->objetoAtivo = i;
-            s->estado = ESTADO_LENDO;
+            // pulpito so abre a prova se o jogador ja fez as 3 provas
+            if (s->objetos[i].tipo == OBJ_PODIO && s->acertos >= ACERTOS_NECESSARIOS) {
+                s->opcao = 0;
+                s->estado = ESTADO_PROVA;
+            } else {
+                s->estado = ESTADO_LENDO;
+            }
         }
     } else if (s->estado == ESTADO_LENDO) {
         Objeto *o = &s->objetos[s->objetoAtivo];
@@ -512,10 +518,22 @@ void interagir(Sala1 *s, Jogador *j) {
         confirmarEscolha(s, j);
     } else if (s->estado == ESTADO_RESULTADO) {
         if (s->reiniciar) {
-            iniciarSala1(s);        // vidas zeraram -> sala recomeca TODA do zero
+            // guarda as vidas perdidas, errar ate zerar tambem tira o ponto da sala
+            int perdidas = s->vidasPerdidas;
+            iniciarSala1(s); // vidas zeram e reinicia a sala
+            s->vidasPerdidas = perdidas;
         } else {
             s->estado = ESTADO_JOGANDO;
         }
+    } else if (s->estado == ESTADO_PROVA) {
+        confirmarProva(s, j);
+    } else if (s->estado == ESTADO_CARD) {
+        // o ponto da sala so conta se nao perdeu nenhuma vida
+        if (s->vidasPerdidas == 0) {
+            j->pontos++;
+        }
+        s->tempoPorta = 0;
+        s->estado = ESTADO_PORTA;
     }
 }
 
@@ -549,7 +567,8 @@ void desenharPainel(Sala1 *s, ALLEGRO_FONT *fonte) {
     ALLEGRO_COLOR dourado = al_map_rgb(210, 190, 150);
     ALLEGRO_COLOR cinza = al_map_rgb(150, 145, 135);
 
-    if (s->estado == ESTADO_JOGANDO) return;
+    if (s->estado != ESTADO_LENDO && s->estado != ESTADO_ESCOLHA &&
+        s->estado != ESTADO_RESULTADO) return;
     o = &s->objetos[s->objetoAtivo];
 
     // mesmo layout do HUD
@@ -615,6 +634,69 @@ void desenharProgresso(Sala1 *s, ALLEGRO_FONT *fonte) {
                               al_map_rgba(210, 190, 150, 150), 1);
     al_draw_textf(fonte, al_map_rgb(238, 224, 196), LARGURA_TELA / 2, 112,
                   ALLEGRO_ALIGN_CENTER, "PROVAS %d/%d", a, ACERTOS_NECESSARIOS);
+}
+
+// pergunta final no pulpito, com 3 alternativas
+void desenharProvaFinal(Sala1 *s, ALLEGRO_FONT *fonte) {
+    int i;
+    ALLEGRO_COLOR bege = al_map_rgb(238, 224, 196);
+    ALLEGRO_COLOR dourado = al_map_rgb(210, 190, 150);
+    ALLEGRO_COLOR cinza = al_map_rgb(150, 145, 135);
+
+    if (s->estado != ESTADO_PROVA) return;
+
+    al_draw_filled_rounded_rectangle(80, 400, LARGURA_TELA - 80, 695, 12, 12,
+        al_map_rgba(9, 12, 16, 240));
+    al_draw_rounded_rectangle(80, 400, LARGURA_TELA - 80, 695, 12, 12,
+        al_map_rgba(210, 190, 150, 170), 1);
+    al_draw_text(fonte, dourado, 105, 417, 0, "PROVA FINAL");
+    al_draw_multiline_text(fonte, bege, 105, 455, LARGURA_TELA - 210, 26, 0,
+                           PERGUNTA_FINAL);
+
+    for (i = 0; i < TOTAL_OPCOES_PROVA; i++) {
+        float y = 530 + i * 42;
+        if (i == s->opcao) {
+            al_draw_filled_rounded_rectangle(105, y - 6, LARGURA_TELA - 105, y + 30, 6, 6,
+                al_map_rgb(70, 58, 38));
+            al_draw_rounded_rectangle(105, y - 6, LARGURA_TELA - 105, y + 30, 6, 6,
+            dourado, 1);
+        }
+        al_draw_textf(fonte, bege, 125, y + 2, 0, "%c)  %s", 'A' + i, OPCOES_FINAL[i]);
+    }
+    al_draw_text(fonte, cinza, LARGURA_TELA - 105, 668, ALLEGRO_ALIGN_RIGHT,
+                 "SETAS cima/baixo escolhem | [ESPAÇO] confirma");
+}
+
+// cartao Voce sabia?, so aparece depois de acertar a prova final
+void desenharCard(Sala1 *s, ALLEGRO_FONT *fonte, ALLEGRO_FONT *fonte_titulo) {
+    if (s->estado != ESTADO_CARD) return;
+
+    // escurece a sala por tras do cartao
+    al_draw_filled_rectangle(0, 0, LARGURA_TELA, ALTURA_TELA, al_map_rgba(0, 0, 0, 170));
+
+    al_draw_filled_rounded_rectangle(250, 170, 1030, 530, 14, 14,
+        al_map_rgba(9, 12, 16, 245));
+    al_draw_rounded_rectangle(250, 170, 1030, 530, 14, 14,
+        al_map_rgba(210, 190, 150, 200), 2);
+    al_draw_text(fonte_titulo, al_map_rgb(190, 45, 37), LARGURA_TELA / 2, 195,
+                 ALLEGRO_ALIGN_CENTER, "VOCÊ SABIA?");
+    al_draw_multiline_text(fonte, al_map_rgb(238, 224, 196), LARGURA_TELA / 2, 280,
+                680, 28, ALLEGRO_ALIGN_CENTER, CARD_TEXTO);
+    al_draw_text(fonte, al_map_rgb(150, 145, 135), LARGURA_TELA / 2, 480,
+                 ALLEGRO_ALIGN_CENTER, "[ESPAÇO] abrir a porta");
+}
+
+// escurece a tela durante a porta e mostra uma previa da sala 2
+void desenharTransicao(Sala1 *s, ALLEGRO_FONT *fonte) {
+    if (s->estado == ESTADO_PORTA) {
+        int alfa = (s->tempoPorta * 255) / PORTA_DURACAO;
+        if (alfa > 255) alfa = 255;
+        al_draw_filled_rectangle(0, 0, LARGURA_TELA, ALTURA_TELA, al_map_rgba(0, 0, 0, alfa));
+    } else if (s->estado == ESTADO_CONCLUIDA) {
+        al_draw_filled_rectangle(0, 0, LARGURA_TELA, ALTURA_TELA, al_map_rgb(0, 0, 0));
+        al_draw_text(fonte, al_map_rgb(238, 224, 196), LARGURA_TELA / 2, ALTURA_TELA / 2,
+                     ALLEGRO_ALIGN_CENTER, "SALA 2 - em construção");
+    }
 }
 
 // main 
