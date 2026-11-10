@@ -392,34 +392,81 @@ void iniciarSala1(Sala1 *s) {
 
 
 
-// devolve o indice do objeto perto do jogador, ou -1 se nao tem nenhum -> ver IndiceObjeto.txt
+// devolve o indice do objeto mais perto do jogador, ou -1 se nao tem nenhum -> ver IndiceObjeto.txt
 int objetoProximo(Jogador *j, Sala1 *s) {
     // os objetos ficam num vetor de struct, e objetoProximo percorre esse vetor com um for, 
     // verificando a distancia do jogador para cada objeto, e se a distancia for menor que o raio de interacao do objeto, 
     // entao o jogador esta perto do objeto e pode interagir com ele
-    int i;
+    int i, melhor = -1;
+    float menor = 0;
     for (i = 0; i < s->qtdObjetos; i++) {
         float dx = j->x - s->objetos[i].x;
         float dy = j->y - s->objetos[i].y;
-        if (dx * dx + dy * dy <= s->objetos[i].raio * s->objetos[i].raio) {
-            return i;
+        float d = dx * dx + dy * dy;
+        if (d <= s->objetos[i].raio * s->objetos[i].raio) {
+            if (melhor == -1 || d < menor) {
+                melhor = i;
+                menor = d;
+            }
         }
     }
-    return -1;
+    return melhor;
 }
 
-// chamada UMA vez a cada aperto de Espaço
+// confimar escolha para saber de fato se acertou
+void confirmarEscolha(Sala1 *s, Jogador *j) {
+    Objeto *o = &s->objetos[s->objetoAtivo];
+    int acertou;
+
+    if (s->opcao == 0) {
+        acertou = o->verdadeiro;        // marcou FATO
+    } else {
+        acertou = !o->verdadeiro;       // marcou PROPAGANDA
+    }
+
+    o->resolvido = 1;
+    s->acertouUltimo = acertou;
+
+    if (acertou) {
+        s->acertos++;
+    } else {
+        s->vidasPerdidas++;
+        s->reiniciar = perderVida(j);
+    }
+    s->estado = ESTADO_RESULTADO;
+}
+
+// chamada UMA vez a cada aperto da tecla ESPACO, para interagir com o objeto mais proximo do jogador, ou fechar a caixa de texto, ou confirmar a escolha
 void interagir(Sala1 *s, Jogador *j) {
     if (s->estado == ESTADO_JOGANDO) {
-        int indice = objetoProximo(j, s);
-        if (indice != -1) {
-            s->objetoAtivo = indice;
-            s->objetos[indice].examinado = 1;
+        int i = objetoProximo(j, s);
+        if (i != -1) {
+            s->objetoAtivo = i;
             s->estado = ESTADO_LENDO;
         }
     } else if (s->estado == ESTADO_LENDO) {
-        s->objetoAtivo = -1;
-        s->estado = ESTADO_JOGANDO;
+        Objeto *o = &s->objetos[s->objetoAtivo];
+        if (o->tipo == OBJ_FRAGMENTO && !o->resolvido) {
+            s->opcao = 0;
+            s->estado = ESTADO_ESCOLHA;
+        } else {
+            s->estado = ESTADO_JOGANDO;
+        }
+    } else if (s->estado == ESTADO_ESCOLHA) {
+        confirmarEscolha(s, j);
+    } else if (s->estado == ESTADO_RESULTADO) {
+        if (s->reiniciar) {
+            iniciarSala1(s);        // vidas zeraram -> sala recomeca TODA do zero
+        } else {
+            s->estado = ESTADO_JOGANDO;
+        }
+    }
+}
+
+// setas esquerda/direita -> quando tiver em opcao de ESCOLHA
+void escolherOpcao(Sala1 *s, int opcao) {
+    if (s->estado == ESTADO_ESCOLHA) {
+        s->opcao = opcao;
     }
 }
 
