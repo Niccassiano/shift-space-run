@@ -297,6 +297,57 @@ void desenharFlash(Jogador *j) {
     }
 }
 
+// sala 01, com cartazes que o jogador pode interagir e ler
+void adicionarObjeto(Sala1 *s, float x, float y, char *texto) {
+    Objeto *o = &s->objetos[s->qtdObjetos];
+    o->x = x;
+    o->y = y;
+    o->raio = RAIO_INTERACAO;
+    strcpy(o->texto, texto);
+    o->examinado = 0;
+    s->qtdObjetos++;
+}
+
+void iniciarSala1(Sala1 *s) {
+    s->estado = ESTADO_JOGANDO;
+    s->qtdObjetos = 0;
+    s->objetoAtivo = -1;
+    s->tempo = 0;
+
+    // adicionando cartazes na sala 01, com posicao x e y e o texto que sera exibido quando o jogador interagir com ele
+    adicionarObjeto(s, 300, 560, "Cartaz Guerra");
+    adicionarObjeto(s, 640, 560, "Cartaz Bombas");
+    adicionarObjeto(s, 980, 560, "Cartaz Prisioneiro");
+}
+
+// devolve o indice do objeto perto do jogador, ou -1 se nao tem nenhum
+int objetoProximo(Jogador *j, Sala1 *s) {
+    int i;
+    for (i = 0; i < s->qtdObjetos; i++) {
+        float dx = j->x - s->objetos[i].x;
+        float dy = j->y - s->objetos[i].y;
+        if (dx * dx + dy * dy <= s->objetos[i].raio * s->objetos[i].raio) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+// chamada UMA vez a cada aperto de Espaço
+void interagir(Sala1 *s, Jogador *j) {
+    if (s->estado == ESTADO_JOGANDO) {
+        int indice = objetoProximo(j, s);
+        if (indice != -1) {
+            s->objetoAtivo = indice;
+            s->objetos[indice].examinado = 1;
+            s->estado = ESTADO_LENDO;
+        }
+    } else if (s->estado == ESTADO_LENDO) {
+        s->objetoAtivo = -1;
+        s->estado = ESTADO_JOGANDO;
+    }
+}
+
 
 // main 
 
