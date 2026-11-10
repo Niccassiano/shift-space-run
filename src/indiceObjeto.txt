@@ -1,0 +1,82 @@
+1. Exemplo de posicionamento
+     |                              ● Objeto
+     |                            / |
+     |                         /    | dy
+     |                      /       |
+     |                   /          |
+     |       ● Jogador              |
+     |       |_____________________|
+     |                dx
+     |
+     |________________________________
+
+Por exemplo:
+- Jogador: X = 100 e Y = 100.
+- Objeto: X = 130 e Y = 140.
+Então:
+
+dx = 100-130=-30
+
+dy = 100-140=-40
+
+O resultado negativo só indica que o objeto está à direita e abaixo do jogador.
+
+A linha diagonal representa a distância entre o jogador e o objeto.
+2. Fluxo da função
+          INÍCIO
+             |
+             v
+    Recebe jogador e sala
+             |
+             v
+    Percorre os objetos da sala
+             |
+             v
+   Jogador está dentro do raio?
+          /       \
+        SIM        NÃO
+         |           |
+         v           v
+      return i   Próximo objeto
+                     |
+                     v
+                Continua FOR
+                     |
+                     v
+             Nenhum encontrado
+                     |
+                     v
+                  return -1
+
+
+Código	Função
+for	Percorre os objetos.
+s->qtdObjetos	Quantidade de objetos na sala.
+s->objetos[i]	Acessa um objeto específico.
+dx	Diferença horizontal.
+dy	Diferença vertical.
+raio	Distância máxima de interação.
+return i	Retorna o objeto encontrado.
+return -1	Nenhum objeto encontrado.
+
+
+
+Aqui temos:
+- int: significa que a função vai retornar um número inteiro.
+- objetoProximo: nome da função.
+- Jogador *j: ponteiro para o jogador.
+- Sala1 *s: ponteiro para a sala, onde estão armazenados os objetos.
+Por que retorna um número inteiro?
+
+Porque cada objeto possui uma posição dentro do vetor.
+
+Por exemplo:
+Índice	Objeto
+0	Chave
+1	Porta
+2	Documento
+3	Caixa
+
+Se o jogador estiver perto da porta, a função retorna 1.
+
+Se não estiver perto de nenhum objeto, retorna -1.
