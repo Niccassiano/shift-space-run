@@ -25,7 +25,9 @@ shift-space-run/
 Requer o Allegro 5 instalado e configurado no PATH/compilador (MinGW).
 
 ```
-gcc src/main.c -o build/shift-space-run.exe -lallegro -lallegro_main -lallegro_image -lallegro_font -lallegro_ttf -lallegro_primitives
+gcc src/main.c -o build/shift-space-run -lallegro -lallegro_main -lallegro_image -lallegro_primitives -lallegro_font -lallegro_ttf
 ```
 
 Ou use a task configurada em `.vscode/tasks.json` (Ctrl+Shift+B).
+
+No macOS, o módulo `allegro_main-5` continua necessário para o linker encontrar a função `main` do Allegro.
