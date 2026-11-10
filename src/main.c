@@ -57,7 +57,10 @@ typedef struct {
 
     // fazer personagem andar
     int furtivo;     
-    int contador;    
+    int contador;   
+
+    // efeito visual, contador de frames restantes do flash vermelho 
+    int flash;       
 } Jogador;
 
 void iniciarJogador(Jogador *j) {
@@ -74,6 +77,9 @@ void iniciarJogador(Jogador *j) {
     // personagem andar
     j->furtivo = 0;
     j->contador = 0;
+
+    // efeito visual de flash vermelho
+    j->flash = 0;
 }
 // inicia com uma funcao que carrega o ponteiro do jogo e suas vidas, pontos e etc 
 
@@ -176,6 +182,27 @@ void moverJogador(Jogador *j, ALLEGRO_KEYBOARD_STATE *teclado) {
     } else {
         j->frame = 0;
         j->contador = 0;
+    }
+}
+
+// posicao inical da sala -> hub e vidas
+void reiniciarSala(Jogador *j) {
+    j->vidas = 3;
+    j->x = 640;
+    j->y = 620;
+    j->direcao = 0;
+    j->frame = 0;
+    j->contador = 0;
+}
+
+// erro ou deteccao custa 1 vida, com flash vermelho
+void perderVida(Jogador *j) {
+    j->vidas--;
+    j->flash = FLASH_DURACAO;
+
+    // zerou as vidas, volta ao início da sala com 3 vidas
+    if (j->vidas <= 0) {
+        reiniciarSala(j);
     }
 }
 
