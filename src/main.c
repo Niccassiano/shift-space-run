@@ -103,6 +103,8 @@ typedef struct {
     int reiniciar;       // 1 se a ultima resposta zerou as vidas
 } Sala1;
 
+// parei passo 3 Cadastro dos objetos
+
 void iniciarJogador(Jogador *j) {
     strcpy(j->nome, "Prisioneiro");
     j->vidas = 3;
@@ -316,28 +318,79 @@ void desenharFlash(Jogador *j) {
 }
 
 // sala 01, com cartazes que o jogador pode interagir e ler
-void adicionarObjeto(Sala1 *s, float x, float y, char *texto) {
+void adicionarObjeto(Sala1 *s, int tipo, float x, float y, int verdadeiro,
+                     const char *titulo, const char *texto, const char *explicacao) {
     Objeto *o = &s->objetos[s->qtdObjetos];
+    o->tipo = tipo;
     o->x = x;
     o->y = y;
     o->raio = RAIO_INTERACAO;
+    o->verdadeiro = verdadeiro;
+    o->resolvido = 0;
+    strcpy(o->titulo, titulo);
     strcpy(o->texto, texto);
-    o->examinado = 0;
+    strcpy(o->explicacao, explicacao);
     s->qtdObjetos++;
 }
 
+// adicionando cartazes na sala 01, com posicao x e y e o texto que sera exibido quando o jogador interagir com ele
+// trocar lugar de cada objeto 
 void iniciarSala1(Sala1 *s) {
     s->estado = ESTADO_JOGANDO;
     s->qtdObjetos = 0;
     s->objetoAtivo = -1;
     s->tempo = 0;
+    s->acertos = 0;
+    s->vidasPerdidas = 0;
+    s->opcao = 0;
+    s->acertouUltimo = 0;
+    s->reiniciar = 0;
 
-    // adicionando cartazes na sala 01, com posicao x e y e o texto que sera exibido quando o jogador interagir com ele
-    adicionarObjeto(s, 300, 560, "Cartaz Guerra");
-    adicionarObjeto(s, 750, 560, "Cartaz Bombas");
-    adicionarObjeto(s, 1200, 560, "Cartaz Prisioneiro");
-    // trocar lugar de cada objeto 
+
+    // CARTAZ PARA ELE CONSEGUIR ESTUDAR E PEGAR OS FRAGMENTOS, COM O TEXTO DE PROPAGANDA DO PARTIDO
+    adicionarObjeto(s, OBJ_CARTAZ, 140, 560, 0, "Cartaz do partido",
+        "'UM POVO, UM PAÍS, UM LÍDER.' Soa como união. Mas quem decidia quem fazia parte desse 'povo'? Guarde essa pergunta.",
+        "");
+    adicionarObjeto(s, OBJ_CARTAZ, 425, 650, 0, "Cartaz do partido",
+        "'ORDEM E PROSPERIDADE PARA TODOS.' Está escrito na parede de um lugar onde ninguém é livre. Slogan não é prova: procure documentos.",
+        "");
+    adicionarObjeto(s, OBJ_CARTAZ, 1090, 560, 0, "Cartaz do partido",
+        "'O LÍDER SABE. OUÇA E CONFIE.' Quem escuta uma voz só deixa de comparar. Regra de quem quer sobreviver: desconfie do que não tem data, fonte ou documento.",
+        "");
+
+    // FRAGMENTOS VERDADEIROS (com base nas fontes do USHMM (Museu do Holocausto dos EUA))
+    adicionarObjeto(s, OBJ_FRAGMENTO, 235, 650, 1, "Jornal, 30 de janeiro de 1933",
+        "O presidente Hindenburg nomeia Adolf Hitler chanceler. Na última eleição, o partido nazista teve cerca de um terço dos votos, longe da maioria.",
+        "Hitler foi nomeado, não eleito. Chegou ao poder por um acordo entre políticos conservadores, e o partido nunca teve a maioria dos votos.");
+    adicionarObjeto(s, OBJ_FRAGMENTO, 520, 560, 1, "Decreto de 13 de março de 1933",
+        "Cria-se o Ministério da Propaganda, entregue a Joseph Goebbels. Rádio, imprensa, cinema e teatro passam a ficar sob a autoridade dele.",
+        "Em poucos meses, o governo passou a decidir o que os alemães liam, ouviam e viam. Controlar a informação foi um dos primeiros passos da ditadura.");
+    adicionarObjeto(s, OBJ_FRAGMENTO, 900, 560, 1, "Congresso do Partido, Nuremberg",
+        "Todo ano, o partido tomava Nuremberg com desfiles, bandeiras e discursos encenados para impressionar. Em setembro de 1935, foi nesse palco que Hitler anunciou novas leis.",
+        "Os congressos eram propaganda em forma de espetáculo, feitos para passar força e união. As Leis de Nuremberg foram anunciadas durante o congresso de 1935.");
+    adicionarObjeto(s, OBJ_FRAGMENTO, 805, 650, 1, "Lei da Cidadania do Reich, 15/09/1935",
+        "Só é cidadão quem tem 'sangue alemão'. Os judeus deixam de ser cidadãos e viram 'súditos do Estado', sem direitos políticos.",
+        "Centenas de milhares de pessoas que eram alemãs perderam a cidadania e os direitos políticos, quatro anos antes de a guerra começar.");
+    adicionarObjeto(s, OBJ_FRAGMENTO, 995, 650, 1, "Decreto de 14 de novembro de 1935",
+        "Em geral, quem tinha três ou quatro avós judeus era considerado judeu pela lei, mesmo sem praticar a religião ou tendo se convertido a outra.",
+        "A lei definiu por descendência: nada que a pessoa acreditasse ou fizesse mudava a classificação. Era perseguição pelo que se é, não pelo que se faz.");
+
+    // FRAGMENTOS FALSOS
+    adicionarObjeto(s, OBJ_FRAGMENTO, 330, 560, 0, "Cartaz do partido (sem data)",
+        "'O POVO ALEMÃO ESCOLHEU O SEU LÍDER! Hitler venceu as eleições com a maioria dos votos.'",
+        "Nas eleições de 1932 e 1933 o partido não teve a maioria dos votos, e Hitler assumiu por nomeação. Repare: o cartaz não cita data nem documento.");
+    adicionarObjeto(s, OBJ_FRAGMENTO, 615, 650, 0, "Nota oficial (sem fonte)",
+        "A imprensa alemã continua livre. Cada jornal publica o que quiser, sem ordens do governo.",
+        "O Ministério da Propaganda mandava instruções diárias aos jornais sobre o que publicar e o que calar. Jornais de oposição foram fechados.");
+    adicionarObjeto(s, OBJ_FRAGMENTO, 710, 560, 0, "Nota oficial (sem fonte)",
+        "As Leis de Nuremberg protegem todos os alemães e garantem os mesmos direitos a cada cidadão.",
+        "A lei fez o contrário: tirou a cidadania dos judeus e proibiu casamentos entre judeus e outros alemães. Propaganda costuma dar nome bonito ao que exclui.");
 }
+// 300, 560
+// 750, 560
+// 1200, 560
+
+
 
 // devolve o indice do objeto perto do jogador, ou -1 se nao tem nenhum -> ver IndiceObjeto.txt
 int objetoProximo(Jogador *j, Sala1 *s) {
