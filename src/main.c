@@ -26,8 +26,8 @@
 #define LIMITE_CIMA 500
 #define LIMITE_BAIXO 700
 
-// tamanho do cenario, 10 salas, cada sala tem 1280x720
-#define TOTAL_SALAS 10
+// tamanho do cenario, 6 salas, cada sala tem 1280x720
+#define TOTAL_SALAS 6
 // define quanto tempo o personagem ficara com o efeito visual de flash vermelho
 #define FLASH_DURACAO 20   // frames do flash vermelho (~0,33 s a 60 FPS)
 // o efeito visual de flash vermelho vai durar 20 frames -> 20/60 = 0,33 segundos que o personagem ficara com o efeito
@@ -67,6 +67,8 @@
 #define TOTAL_OPCOES_PROVA 3
 #define OPCAO_CORRETA_PROVA 1     // indice da resposta certa (GABARITO A SEGUNDA E A CORRETA)
 #define PORTA_DURACAO 180         // frames da transicao (3 segundos a 60 FPS)
+#define ABERTURA_TITULO 95        // duracao do titulo antes de escurecer (~0,75 s)
+#define ABERTURA_FADE 30          // duracao de cada fade (~0,3 s)
 
 // cria uma variavel global para a pergunta final e as opcoes de resposta, para que o jogador possa interagir com o pulpito e responder a pergunta final
 static const char *PERGUNTA_FINAL =
@@ -333,6 +335,22 @@ void desenharIdentidade(ALLEGRO_FONT *fonte_titulo, ALLEGRO_FONT *fonte_descrica
     al_draw_text(fonte_descricao, al_map_rgb(220, 202, 166),
                  LARGURA_TELA / 2, 62, ALLEGRO_ALIGN_CENTRE, frase);
     al_draw_filled_rectangle(516, 89, 764, 91, al_map_rgb(166, 42, 34));
+}
+
+// tela inicial apenas o titulo, seguido de fade
+void desenharTelaInicial(ALLEGRO_FONT *fonte_titulo, int quadro) {
+    int alfa = 255;
+    int inicioFade = ABERTURA_TITULO;
+    int fimFade = ABERTURA_TITULO + ABERTURA_FADE;
+
+    al_clear_to_color(al_map_rgb(0, 0, 0));
+    if (quadro >= inicioFade) {
+        alfa = 255 * (fimFade - quadro) / ABERTURA_FADE;
+        if (alfa < 0) alfa = 0;
+    }
+    al_draw_text(fonte_titulo, al_map_rgba(238, 224, 196, alfa),
+                 LARGURA_TELA / 2, ALTURA_TELA / 2 - 24,
+                 ALLEGRO_ALIGN_CENTER, "Shift Space Run");
 }
 
 // flash vermelho por cima de tudo
@@ -699,6 +717,24 @@ void desenharTransicao(Sala1 *s, ALLEGRO_FONT *fonte) {
     }
 }
 
+// para a musica
+ALLEGRO_AUDIO_STREAM *trocarMusica(ALLEGRO_AUDIO_STREAM *atual, const char *arquivo) {
+    ALLEGRO_AUDIO_STREAM *nova;
+
+    if (atual != NULL) {
+        al_destroy_audio_stream(atual);
+    }
+    nova = al_load_audio_stream(arquivo, 4, 2048);
+    if (nova == NULL) {
+        fprintf(stderr, "aviso: nao carregou %s\n", arquivo);
+        return NULL;
+    }
+    al_attach_audio_stream_to_mixer(nova, al_get_default_mixer());
+    al_set_audio_stream_playmode(nova, ALLEGRO_PLAYMODE_LOOP);
+    al_set_audio_stream_gain(nova, 0.6);
+    return nova;
+}
+
 // main 
 
 int main(void) {
@@ -710,10 +746,15 @@ int main(void) {
     ALLEGRO_FONT *fonte = NULL;
     ALLEGRO_FONT *fonte_titulo = NULL; 
     ALLEGRO_FONT *fonte_descricao = NULL;
+    ALLEGRO_AUDIO_STREAM *musica = NULL;
+    ALLEGRO_SAMPLE *somPorta = NULL;
     Jogador jogador;
     Sala1 sala;
     int rodando = 1;
     int redesenhar = 1;
+    int audioOk = 1;
+    int portaTocada = 0;
+    int quadroAbertura = 0;
     // utilizando a biblioteca allegro para pegar o estado do teclado
     ALLEGRO_KEYBOARD_STATE teclado;
 
@@ -740,6 +781,10 @@ int main(void) {
     if (!al_install_keyboard()) {
         fprintf(stderr, "erro da funcao al_install_keyboard()\n");
         return 1;
+    }
+    if (!al_install_audio() || !al_init_acodec_addon() || !al_reserve_samples(4)) {
+        fprintf(stderr, "aviso: audio indisponivel, o jogo roda sem som\n");
+        audioOk = 0;
     }
 
     tela = al_create_display(LARGURA_TELA, ALTURA_TELA);
@@ -821,6 +866,10 @@ int main(void) {
         return 1;
     }
 
+    if (audioOk) {
+        musica = trocarMusica(NULL, "assets/audio/leberch-dark-628052.mp3");
+    }
+
     // removido carregarSprites e liberarSprites, pois nao ha mais necessidade de carregar 9 imagens separadas
 
     al_register_event_source(fila, al_get_display_event_source(tela));
@@ -844,42 +893,81 @@ int main(void) {
             if (tecla == ALLEGRO_KEY_ESCAPE) {
                 rodando = 0;
             }
-            if (tecla == ALLEGRO_KEY_SPACE) {
-                interagir(&sala, &jogador);
-            }
-            if (tecla == ALLEGRO_KEY_LEFT || tecla == ALLEGRO_KEY_A) {
-                escolherOpcao(&sala, 0);    // FATO
-            }
-            if (tecla == ALLEGRO_KEY_RIGHT || tecla == ALLEGRO_KEY_D) {
-                escolherOpcao(&sala, 1);    // PROPAGANDA
+            if (quadroAbertura >= ABERTURA_TITULO + ABERTURA_FADE) {
+                if (tecla == ALLEGRO_KEY_SPACE) {
+                    interagir(&sala, &jogador);
+                }
+                if (tecla == ALLEGRO_KEY_LEFT || tecla == ALLEGRO_KEY_A) {
+                    escolherOpcao(&sala, 0);    // FATO
+                }
+                if (tecla == ALLEGRO_KEY_RIGHT || tecla == ALLEGRO_KEY_D) {
+                    escolherOpcao(&sala, 1);    // PROPAGANDA
+                }
+                if (tecla == ALLEGRO_KEY_UP || tecla == ALLEGRO_KEY_W) {
+                    mudarOpcaoProva(&sala, -1);
+                }
+                if (tecla == ALLEGRO_KEY_DOWN || tecla == ALLEGRO_KEY_S) {
+                    mudarOpcaoProva(&sala, 1);
+                }
             }
         }
         if (evento.type == ALLEGRO_EVENT_TIMER) {
-            sala.tempo++;
-            if (sala.estado == ESTADO_JOGANDO) {
-                al_get_keyboard_state(&teclado);
-                // faz o personagem andar de acordo com a tecla pressionada
-                moverJogador(&jogador, &teclado);
+            if (quadroAbertura < ABERTURA_TITULO + ABERTURA_FADE) {
+                quadroAbertura++;
             } else {
-                jogador.frame = 0;
+                sala.tempo++;
+                if (sala.estado == ESTADO_JOGANDO) {
+                    al_get_keyboard_state(&teclado);
+                    // faz o personagem andar de acordo com a tecla pressionada
+                    moverJogador(&jogador, &teclado);
+                } else {
+                    jogador.frame = 0;
+                }
+                // transicao da porta: silencia a musica durante o fade
+                if (sala.estado == ESTADO_PORTA) {
+                    if (!portaTocada) {
+                        portaTocada = 1;
+                        if (musica != NULL) {
+                            al_set_audio_stream_playing(musica, false);
+                        }
+                        if (somPorta != NULL) {
+                            al_play_sample(somPorta, 1.0, 0.0, 1.0,
+                                           ALLEGRO_PLAYMODE_ONCE, NULL);
+                        }
+                    }
+                    sala.tempoPorta++;
+                    if (sala.tempoPorta >= PORTA_DURACAO) {
+                        jogador.sala = 2;
+                        sala.estado = ESTADO_CONCLUIDA;
+                    }
+                }
             }
             redesenhar = 1;
         }
 
         if (redesenhar && al_is_event_queue_empty(fila)) {
             redesenhar = 0;
-            desenharCenario(fundo);
-            desenharJogador(&jogador, spritesheet);
-            desenharIcone(&jogador, &sala, fonte);
-            desenharHUD(&jogador, fonte);
-            desenharProgresso(&sala, fonte);
-            desenharPainel(&sala, fonte);
-            desenharIdentidade(fonte_titulo, fonte_descricao);
-            desenharFlash(&jogador);
+            if (quadroAbertura < ABERTURA_TITULO + ABERTURA_FADE) {
+                desenharTelaInicial(fonte_titulo, quadroAbertura);
+            } else {
+                desenharCenario(fundo);
+                desenharJogador(&jogador, spritesheet);
+                desenharIcone(&jogador, &sala, fonte);
+                desenharHUD(&jogador, fonte);
+                desenharProgresso(&sala, fonte);
+                desenharPainel(&sala, fonte);
+                desenharProvaFinal(&sala, fonte);
+                desenharIdentidade(fonte_titulo, fonte_descricao);
+                desenharFlash(&jogador);
+                desenharCard(&sala, fonte, fonte_titulo);
+                desenharTransicao(&sala, fonte);
+            }
             al_flip_display();
         }
     }
 
+    if (somPorta != NULL) al_destroy_sample(somPorta);
+    if (musica != NULL) al_destroy_audio_stream(musica);
     al_destroy_font(fonte);
     al_destroy_font(fonte_descricao);
     al_destroy_font(fonte_titulo);
