@@ -5,6 +5,8 @@
 #include <allegro5/allegro_font.h>
 #include <allegro5/allegro_ttf.h>
 #include <allegro5/allegro_primitives.h>
+#include <allegro5/allegro_audio.h>
+#include <allegro5/allegro_acodec.h>
 
 #define LARGURA_TELA 1280
 #define ALTURA_TELA  720
@@ -24,8 +26,8 @@
 #define LIMITE_CIMA 500
 #define LIMITE_BAIXO 700
 
-// tamanho do cenario, 10 salas, cada sala tem 1280x720
-#define TOTAL_SALAS 10
+// tamanho do cenario, 6 salas, cada sala tem 1280x720
+#define TOTAL_SALAS 6
 // define quanto tempo o personagem ficara com o efeito visual de flash vermelho
 #define FLASH_DURACAO 20   // frames do flash vermelho (~0,33 s a 60 FPS)
 // o efeito visual de flash vermelho vai durar 20 frames -> 20/60 = 0,33 segundos que o personagem ficara com o efeito
@@ -41,13 +43,48 @@
 // 3ª	17
 // 10ª	10
 // 19ª	1
-// 20ª	0 -> quando chega a zero, o efeito termina.
+// 20ª	0 -> quando chega a zero, o efeito termina.   
 
-#define MAX_OBJETOS 12
-#define RAIO_INTERACAO 70   // distancia para poder interagir
+#define MAX_OBJETOS 14     // quantidade maxima de objetos que o jogador pode interagir na sala 01
+#define RAIO_INTERACAO 60 // distancia para poder interagir
+#define ACERTOS_NECESSARIOS 3 // quantidade de acertos necessarios para passar de sala
 
-#define ESTADO_JOGANDO 0    // andando 
-#define ESTADO_LENDO   1    // caixa de texto aberta, personagem parado
+#define ESTADO_JOGANDO   0 // andando 
+#define ESTADO_LENDO     1 // caixa de texto aberta, personagem parado
+#define ESTADO_ESCOLHA   2 // escolhendo uma opcao
+#define ESTADO_RESULTADO 3 // resultado da escolha
+
+#define OBJ_CARTAZ    0 // cartaz que o jogador pode interagir e ler
+#define OBJ_FRAGMENTO 1 // fragmento que o jogador pode pegar para ganhar pontos
+
+#define ESTADO_PROVA     4        // pergunta final no pulpito
+#define ESTADO_CARD      5        // cartao "Voce sabia?"
+#define ESTADO_PORTA     6        // som da porta mais tela escurecendo
+#define ESTADO_CONCLUIDA 7        // fim da sala 1
+
+#define OBJ_PODIO 2               // pulpito (prova final)
+
+#define TOTAL_OPCOES_PROVA 3
+#define OPCAO_CORRETA_PROVA 1     // indice da resposta certa (GABARITO A SEGUNDA E A CORRETA)
+#define PORTA_DURACAO 180         // frames da transicao (3 segundos a 60 FPS)
+#define ABERTURA_TITULO 95        // duracao do titulo antes de escurecer (~0,75 s)
+#define ABERTURA_FADE 30          // duracao de cada fade (~0,3 s)
+
+// cria uma variavel global para a pergunta final e as opcoes de resposta, para que o jogador possa interagir com o pulpito e responder a pergunta final
+static const char *PERGUNTA_FINAL =
+    "Em 1935, as Leis de Nuremberg foram anunciadas. O que elas fizeram?";
+
+static const char *OPCOES_FINAL[TOTAL_OPCOES_PROVA] = {
+    "Garantiram os mesmos direitos a todos os alemães.",
+    "Tiraram a cidadania dos judeus alemães e criaram regras de exclusão.",
+    "Marcaram o início da guerra contra a Polônia."
+};
+
+static const char *CARD_TEXTO =
+    "Em 1935, as Leis de Nuremberg tiraram a cidadania dos judeus alemães. "
+    "Um decreto do mesmo ano definiu, por ascendência, quem seria tratado como judeu. "
+    "A exclusão virou lei quatro anos antes de a guerra começar.";
+
 
 // registro de cada jogador 
 typedef struct {
@@ -71,23 +108,33 @@ typedef struct {
 
 // objeto que o jogador pode interagir, ler e pegar pontos
 typedef struct {
-    float x, y;          // ponto de interação NO CHAO (faixa y 500 a 700)
-    float raio;
-    char texto[200];
-    int examinado;       // 1 se ja foi lido
+    int tipo;            // OBJ_CARTAZ ou OBJ_FRAGMENTO
+    float x, y, raio;    // ponto de interacao
+    int verdadeiro;      // fragmento verdadeiro ou falso
+    int resolvido;       // fragmento ja foi resolvido, para nao contar pontos varias vezes
+    char titulo[48];
+    char texto[320];
+    char explicacao[320];
 } Objeto;
 
-// o cartaz esta na parede, se o y do objeto e menor que 500, o jogador nao consegue interagir com ele, pois esta muito longe do chao 
-// entao o x e o do cartaz e o y e 500, para que o jogador consiga interagir com ele, mesmo que o cartaz esteja na parede, pois o personagem esta no chao
+// cartazes ficam nas paredes, mas o ponto de interacao fica no chao: y=560 ou y=650, dentro da faixa 500 a 700
 typedef struct {
     int estado;
-// o estado e o que impede o personagem de andar enquanto esta lendo um cartaz
     Objeto objetos[MAX_OBJETOS];
+// o estado e o que impede o personagem de andar enquanto esta lendo um cartaz
     int qtdObjetos;
-    int objetoAtivo;     // objeto sendo lido, -1 se nenhum
+    int objetoAtivo;     // -1 se nenhum, objeto sendo lido
     // objetoAtivo e o indice do cartaz que o jogador esta lendo, para que o texto do cartaz seja exibido na tela
     int tempo;           // conta frames, para fechar
+    int acertos;
+    int vidasPerdidas;   // vai servir para a pontuacao final, caso o jogador perca vidas, ele nao ganha pontos
+    int opcao;           // 0 = FATO, 1 = PROPAGANDA
+    int acertouUltimo;
+    int reiniciar;       // 1 se a ultima resposta zerou as vidas
+    int tempoPorta;      // frames desde que a porta comecou a abrir
 } Sala1;
+
+// parei passo 3 Cadastro dos objetos
 
 void iniciarJogador(Jogador *j) {
     strcpy(j->nome, "Prisioneiro");
@@ -222,14 +269,16 @@ void reiniciarSala(Jogador *j) {
 }
 
 // erro ou deteccao custa 1 vida, com flash vermelho
-void perderVida(Jogador *j) {
+// devolve 1 se as vidas acabaram e a sala foi reiniciada
+int perderVida(Jogador *j) {
     j->vidas--;
     j->flash = FLASH_DURACAO;
 
-    // zerou as vidas, volta ao início da sala com 3 vidas
     if (j->vidas <= 0) {
         reiniciarSala(j);
+        return 1;
     }
+    return 0; // 0 caso contrario
 }
 
 void desenharHUD(Jogador *j, ALLEGRO_FONT *fonte) {
@@ -274,9 +323,9 @@ void desenharIdentidade(ALLEGRO_FONT *fonte_titulo, ALLEGRO_FONT *fonte_descrica
 
     // reserva uma area propria para o titulo
     al_draw_filled_rounded_rectangle(174, 9, 1106, 96, 12, 12,
-                                     al_map_rgba(9, 12, 16, 225));
+            al_map_rgba(9, 12, 16, 225));
     al_draw_rounded_rectangle(174, 9, 1106, 96, 12, 12,
-                              al_map_rgba(210, 190, 150, 170), 1);
+            al_map_rgba(210, 190, 150, 170), 1);
 
     // logo com sombra e destaque no SPACE
     al_draw_text(fonte_titulo, al_map_rgba(0, 0, 0, 220), inicio + 2, 15, 0, nome);
@@ -286,6 +335,22 @@ void desenharIdentidade(ALLEGRO_FONT *fonte_titulo, ALLEGRO_FONT *fonte_descrica
     al_draw_text(fonte_descricao, al_map_rgb(220, 202, 166),
                  LARGURA_TELA / 2, 62, ALLEGRO_ALIGN_CENTRE, frase);
     al_draw_filled_rectangle(516, 89, 764, 91, al_map_rgb(166, 42, 34));
+}
+
+// tela inicial apenas o titulo, seguido de fade
+void desenharTelaInicial(ALLEGRO_FONT *fonte_titulo, int quadro) {
+    int alfa = 255;
+    int inicioFade = ABERTURA_TITULO;
+    int fimFade = ABERTURA_TITULO + ABERTURA_FADE;
+
+    al_clear_to_color(al_map_rgb(0, 0, 0));
+    if (quadro >= inicioFade) {
+        alfa = 255 * (fimFade - quadro) / ABERTURA_FADE;
+        if (alfa < 0) alfa = 0;
+    }
+    al_draw_text(fonte_titulo, al_map_rgba(238, 224, 196, alfa),
+                 LARGURA_TELA / 2, ALTURA_TELA / 2 - 24,
+                 ALLEGRO_ALIGN_CENTER, "Shift Space Run");
 }
 
 // flash vermelho por cima de tudo
@@ -300,57 +365,200 @@ void desenharFlash(Jogador *j) {
 }
 
 // sala 01, com cartazes que o jogador pode interagir e ler
-void adicionarObjeto(Sala1 *s, float x, float y, char *texto) {
+void adicionarObjeto(Sala1 *s, int tipo, float x, float y, int verdadeiro,
+                     const char *titulo, const char *texto, const char *explicacao) {
     Objeto *o = &s->objetos[s->qtdObjetos];
+    o->tipo = tipo;
     o->x = x;
     o->y = y;
     o->raio = RAIO_INTERACAO;
+    o->verdadeiro = verdadeiro;
+    o->resolvido = 0;
+    strcpy(o->titulo, titulo);
     strcpy(o->texto, texto);
-    o->examinado = 0;
+    strcpy(o->explicacao, explicacao);
     s->qtdObjetos++;
 }
 
+// adicionando cartazes na sala 01, com posicao x e y e o texto que sera exibido quando o jogador interagir com ele
+// trocar lugar de cada objeto 
 void iniciarSala1(Sala1 *s) {
     s->estado = ESTADO_JOGANDO;
     s->qtdObjetos = 0;
     s->objetoAtivo = -1;
     s->tempo = 0;
+    s->acertos = 0;
+    s->vidasPerdidas = 0;
+    s->opcao = 0;
+    s->acertouUltimo = 0;
+    s->reiniciar = 0;
+    s->tempoPorta = 0;
 
-    // adicionando cartazes na sala 01, com posicao x e y e o texto que sera exibido quando o jogador interagir com ele
-    adicionarObjeto(s, 300, 560, "Cartaz Guerra");
-    adicionarObjeto(s, 750, 560, "Cartaz Bombas");
-    adicionarObjeto(s, 1200, 560, "Cartaz Prisioneiro");
-    // trocar lugar de cada objeto 
+
+    // CARTAZ PARA ELE CONSEGUIR ESTUDAR E PEGAR OS FRAGMENTOS, COM O TEXTO DE PROPAGANDA DO PARTIDO
+    adicionarObjeto(s, OBJ_CARTAZ, 140, 560, 0, "Cartaz do partido",
+        "'UM POVO, UM PAÍS, UM LÍDER.' Soa como união. Mas quem decidia quem fazia parte desse 'povo'? Guarde essa pergunta.",
+        "");
+    adicionarObjeto(s, OBJ_CARTAZ, 425, 650, 0, "Cartaz do partido",
+        "'ORDEM E PROSPERIDADE PARA TODOS.' Está escrito na parede de um lugar onde ninguém é livre. Slogan não é prova: procure documentos.",
+        "");
+    adicionarObjeto(s, OBJ_CARTAZ, 1090, 560, 0, "Cartaz do partido",
+        "'O LÍDER SABE. OUÇA E CONFIE.' Quem escuta uma voz só deixa de comparar. Regra de quem quer sobreviver: desconfie do que não tem data, fonte ou documento.",
+        "");
+
+    // FRAGMENTOS VERDADEIROS (com base nas fontes do USHMM (Museu do Holocausto dos EUA))
+    adicionarObjeto(s, OBJ_FRAGMENTO, 235, 650, 1, "Jornal, 30 de janeiro de 1933",
+        "O presidente Hindenburg nomeia Adolf Hitler chanceler. Na última eleição, o partido nazista teve cerca de um terço dos votos, longe da maioria.",
+        "Hitler foi nomeado, não eleito. Chegou ao poder por um acordo entre políticos conservadores, e o partido nunca teve a maioria dos votos.");
+    adicionarObjeto(s, OBJ_FRAGMENTO, 520, 560, 1, "Decreto de 13 de março de 1933",
+        "Cria-se o Ministério da Propaganda, entregue a Joseph Goebbels. Rádio, imprensa, cinema e teatro passam a ficar sob a autoridade dele.",
+        "Em poucos meses, o governo passou a decidir o que os alemães liam, ouviam e viam. Controlar a informação foi um dos primeiros passos da ditadura.");
+    adicionarObjeto(s, OBJ_FRAGMENTO, 900, 560, 1, "Congresso do Partido, Nuremberg",
+        "Todo ano, o partido tomava Nuremberg com desfiles, bandeiras e discursos encenados para impressionar. Em setembro de 1935, foi nesse palco que Hitler anunciou novas leis.",
+        "Os congressos eram propaganda em forma de espetáculo, feitos para passar força e união. As Leis de Nuremberg foram anunciadas durante o congresso de 1935.");
+    adicionarObjeto(s, OBJ_FRAGMENTO, 805, 650, 1, "Lei da Cidadania do Reich, 15/09/1935",
+        "Só é cidadão quem tem 'sangue alemão'. Os judeus deixam de ser cidadãos e viram 'súditos do Estado', sem direitos políticos.",
+        "Centenas de milhares de pessoas que eram alemãs perderam a cidadania e os direitos políticos, quatro anos antes de a guerra começar.");
+    adicionarObjeto(s, OBJ_FRAGMENTO, 995, 650, 1, "Decreto de 14 de novembro de 1935",
+        "Em geral, quem tinha três ou quatro avós judeus era considerado judeu pela lei, mesmo sem praticar a religião ou tendo se convertido a outra.",
+        "A lei definiu por descendência: nada que a pessoa acreditasse ou fizesse mudava a classificação. Era perseguição pelo que se é, não pelo que se faz.");
+
+    // FRAGMENTOS FALSOS
+    adicionarObjeto(s, OBJ_FRAGMENTO, 330, 560, 0, "Cartaz do partido (sem data)",
+        "'O POVO ALEMÃO ESCOLHEU O SEU LÍDER! Hitler venceu as eleições com a maioria dos votos.'",
+        "Nas eleições de 1932 e 1933 o partido não teve a maioria dos votos, e Hitler assumiu por nomeação. Repare: o cartaz não cita data nem documento.");
+    adicionarObjeto(s, OBJ_FRAGMENTO, 700, 650, 0, "Nota oficial (sem fonte)",
+        "A imprensa alemã continua livre. Cada jornal publica o que quiser, sem ordens do governo.",
+        "O Ministério da Propaganda mandava instruções diárias aos jornais sobre o que publicar e o que calar. Jornais de oposição foram fechados.");
+    adicionarObjeto(s, OBJ_FRAGMENTO, 710, 560, 0, "Nota oficial (sem fonte)",
+        "As Leis de Nuremberg protegem todos os alemães e garantem os mesmos direitos a cada cidadão.",
+        "A lei fez o contrário: tirou a cidadania dos judeus e proibiu casamentos entre judeus e outros alemães. Propaganda costuma dar nome bonito ao que exclui.");
+
+    // jogador responde a pergunta final no pulpito, com base nos fragmentos que ele leu e pegou, so quando ele tiver 3/3
+    adicionarObjeto(s, OBJ_PODIO, 640, 505, 0, "Púlpito",
+        "O púlpito está fechado. Antes de subir, prove que sabe separar fato de propaganda: examine os documentos da sala.",
+        "Releia os documentos. Pista: o que dizia a Lei da Cidadania do Reich, de 1935? E a nota oficial que prometia 'direitos iguais'?");
+
 }
+// 300, 560
+// 750, 560
+// 1200, 560
 
-// devolve o indice do objeto perto do jogador, ou -1 se nao tem nenhum -> ver IndiceObjeto.txt
+
+
+// devolve o indice do objeto mais perto do jogador, ou -1 se nao tem nenhum -> ver IndiceObjeto.txt
 int objetoProximo(Jogador *j, Sala1 *s) {
     // os objetos ficam num vetor de struct, e objetoProximo percorre esse vetor com um for, 
     // verificando a distancia do jogador para cada objeto, e se a distancia for menor que o raio de interacao do objeto, 
     // entao o jogador esta perto do objeto e pode interagir com ele
-    int i;
+    int i, melhor = -1;
+    float menor = 0;
     for (i = 0; i < s->qtdObjetos; i++) {
         float dx = j->x - s->objetos[i].x;
         float dy = j->y - s->objetos[i].y;
-        if (dx * dx + dy * dy <= s->objetos[i].raio * s->objetos[i].raio) {
-            return i;
+        float d = dx * dx + dy * dy;
+        if (d <= s->objetos[i].raio * s->objetos[i].raio) {
+            if (melhor == -1 || d < menor) {
+                melhor = i;
+                menor = d;
+            }
         }
     }
-    return -1;
+    return melhor;
 }
 
-// chamada UMA vez a cada aperto de Espaço
+// confimar escolha para saber de fato se acertou
+void confirmarEscolha(Sala1 *s, Jogador *j) {
+    Objeto *o = &s->objetos[s->objetoAtivo];
+    int acertou;
+
+    if (s->opcao == 0) {
+        acertou = o->verdadeiro;        // marcou FATO
+    } else {
+        acertou = !o->verdadeiro;       // marcou PROPAGANDA
+    }
+
+    o->resolvido = 1;
+    s->acertouUltimo = acertou;
+
+    if (acertou) {
+        s->acertos++;
+    } else {
+        s->vidasPerdidas++;
+        s->reiniciar = perderVida(j);
+    }
+    s->estado = ESTADO_RESULTADO;
+}
+
+// setas cima/baixo trocam a alternativa da pergunta final para o jogador escolher, e a funcao mudarOpcaoProva eh chamada a cada aperto de tecla para mudar a opcao selecionada
+void mudarOpcaoProva(Sala1 *s, int passo) {
+    if (s->estado != ESTADO_PROVA) return;
+    s->opcao = s->opcao + passo;
+    if (s->opcao < 0) s->opcao = TOTAL_OPCOES_PROVA - 1;
+    if (s->opcao >= TOTAL_OPCOES_PROVA) s->opcao = 0;
+}
+
+// confere a resposta da pergunta final 
+void confirmarProva(Sala1 *s, Jogador *j) {
+    if (s->opcao == OPCAO_CORRETA_PROVA) {
+        s->estado = ESTADO_CARD;
+    } else {
+        s->acertouUltimo = 0;
+        s->vidasPerdidas++;
+        s->reiniciar = perderVida(j);
+        s->estado = ESTADO_RESULTADO;   // mostra  ERRADO mais a dica do pulpito
+    }
+}
+
+// chamada UMA vez a cada aperto da tecla ESPACO, para interagir com o objeto mais proximo do jogador, ou fechar a caixa de texto, ou confirmar a escolha
 void interagir(Sala1 *s, Jogador *j) {
     if (s->estado == ESTADO_JOGANDO) {
-        int indice = objetoProximo(j, s);
-        if (indice != -1) {
-            s->objetoAtivo = indice;
-            s->objetos[indice].examinado = 1;
-            s->estado = ESTADO_LENDO;
+        int i = objetoProximo(j, s);
+        if (i != -1) {
+            s->objetoAtivo = i;
+            // pulpito so abre a prova se o jogador ja fez as 3 provas
+            if (s->objetos[i].tipo == OBJ_PODIO && s->acertos >= ACERTOS_NECESSARIOS) {
+                s->opcao = 0;
+                s->estado = ESTADO_PROVA;
+            } else {
+                s->estado = ESTADO_LENDO;
+            }
         }
     } else if (s->estado == ESTADO_LENDO) {
-        s->objetoAtivo = -1;
-        s->estado = ESTADO_JOGANDO;
+        Objeto *o = &s->objetos[s->objetoAtivo];
+        if (o->tipo == OBJ_FRAGMENTO && !o->resolvido) {
+            s->opcao = 0;
+            s->estado = ESTADO_ESCOLHA;
+        } else {
+            s->estado = ESTADO_JOGANDO;
+        }
+    } else if (s->estado == ESTADO_ESCOLHA) {
+        confirmarEscolha(s, j);
+    } else if (s->estado == ESTADO_RESULTADO) {
+        if (s->reiniciar) {
+            // guarda as vidas perdidas, errar ate zerar tambem tira o ponto da sala
+            int perdidas = s->vidasPerdidas;
+            iniciarSala1(s); // vidas zeram e reinicia a sala
+            s->vidasPerdidas = perdidas;
+        } else {
+            s->estado = ESTADO_JOGANDO;
+        }
+    } else if (s->estado == ESTADO_PROVA) {
+        confirmarProva(s, j);
+    } else if (s->estado == ESTADO_CARD) {
+        // o ponto da sala so conta se nao perdeu nenhuma vida
+        if (s->vidasPerdidas == 0) {
+            j->pontos++;
+        }
+        s->tempoPorta = 0;
+        s->estado = ESTADO_PORTA;
+    }
+}
+
+// setas esquerda/direita -> quando tiver em opcao de ESCOLHA
+void escolherOpcao(Sala1 *s, int opcao) {
+    if (s->estado == ESTADO_ESCOLHA) {
+        s->opcao = opcao;
     }
 }
 
@@ -370,20 +578,161 @@ void desenharIcone(Jogador *j, Sala1 *s, ALLEGRO_FONT *fonte) {
     }
 }
 // funcao de desenhar caixa de texto do cartaz que o jogador esta lendo, com o texto do cartaz
-void desenharCaixaTexto(Sala1 *s, ALLEGRO_FONT *fonte) {
-    if (s->estado != ESTADO_LENDO) return;
+// painel de leitura, escolha e resultado (fica na parte de baixo da tela)
+void desenharPainel(Sala1 *s, ALLEGRO_FONT *fonte) {
+    Objeto *o;
+    ALLEGRO_COLOR bege = al_map_rgb(238, 224, 196);
+    ALLEGRO_COLOR dourado = al_map_rgb(210, 190, 150);
+    ALLEGRO_COLOR cinza = al_map_rgb(150, 145, 135);
 
-    // caixa na parte de baixo da tela, para nao atrapalhar o personagem, com o texto do cartaz que o jogador esta lendo
-    al_draw_filled_rectangle(100, 540, LARGURA_TELA - 100, 690, al_map_rgb(15, 15, 15));
-    al_draw_rectangle(100, 540, LARGURA_TELA - 100, 690, al_map_rgb(230, 230, 230), 3);
+    if (s->estado != ESTADO_LENDO && s->estado != ESTADO_ESCOLHA &&
+        s->estado != ESTADO_RESULTADO) return;
+    o = &s->objetos[s->objetoAtivo];
 
-    al_draw_multiline_text(fonte, al_map_rgb(230, 230, 230),
-            125, 560, LARGURA_TELA - 250, 28, 0,
-            s->objetos[s->objetoAtivo].texto);
+    // mesmo layout do HUD
+    al_draw_filled_rounded_rectangle(80, 450, LARGURA_TELA - 80, 695, 12, 12,
+        al_map_rgba(9, 12, 16, 235));
+    al_draw_rounded_rectangle(80, 450, LARGURA_TELA - 80, 695, 12, 12,
+        al_map_rgba(210, 190, 150, 170), 1);
+    al_draw_text(fonte, dourado, 105, 467, 0, o->titulo);
 
-    al_draw_text(fonte, al_map_rgb(150, 150, 150),
-            LARGURA_TELA - 125, 660, ALLEGRO_ALIGN_RIGHT,
+    // resultado da escolha, se acertou ou errou, e explicacao do fragmento
+    if (s->estado == ESTADO_RESULTADO) {
+        if (s->acertouUltimo) {
+            al_draw_text(fonte, al_map_rgb(120, 170, 100), 105, 505, 0, "CORRETO");
+        } else {
+            al_draw_text(fonte, al_map_rgb(200, 60, 50), 105, 505, 0, "ERRADO  (-1 vida)");
+        }
+        al_draw_multiline_text(fonte, bege, 105, 541, LARGURA_TELA - 210, 26, 0,
+            o->explicacao);
+        if (s->reiniciar) {
+            al_draw_text(fonte, al_map_rgb(200, 60, 50), 105, 630, 0,
+            "Suas vidas acabaram. A sala será reiniciada.");
+        }
+        al_draw_text(fonte, cinza, LARGURA_TELA - 105, 668, ALLEGRO_ALIGN_RIGHT,
+            "[ESPAÇO] continuar");
+        return;
+    }
+
+    // lendo ou escolhendo, exibe o texto do cartaz ou fragmento
+    al_draw_multiline_text(fonte, bege, 105, 505, LARGURA_TELA - 210, 26, 0, o->texto);
+
+    if (s->estado == ESTADO_ESCOLHA) {
+        // destaca a opcao selecionada
+        if (s->opcao == 0) {
+            al_draw_filled_rounded_rectangle(105, 625, 265, 660, 6, 6,
+                al_map_rgb(60, 105, 55));
+        } else {
+            al_draw_filled_rounded_rectangle(290, 625, 490, 660, 6, 6,
+                al_map_rgb(135, 38, 32));
+        }
+        al_draw_text(fonte, bege, 185, 634, ALLEGRO_ALIGN_CENTER, "FATO");
+        al_draw_text(fonte, bege, 390, 634, ALLEGRO_ALIGN_CENTER, "PROPAGANDA");
+        al_draw_text(fonte, cinza, LARGURA_TELA - 105, 634, ALLEGRO_ALIGN_RIGHT,
+            "SETAS escolhem | [ESPAÇO] confirma");
+    } else {
+        if (o->tipo == OBJ_FRAGMENTO && !o->resolvido) {
+            al_draw_text(fonte, cinza, LARGURA_TELA - 105, 668, ALLEGRO_ALIGN_RIGHT,
+            "[ESPAÇO] analisar este documento");
+        } else {
+            al_draw_text(fonte, cinza, LARGURA_TELA - 105, 668, ALLEGRO_ALIGN_RIGHT,
             "[ESPAÇO] fechar");
+        }
+    }
+}
+
+// cartao de progresso logo abaixo do header PROVAS 1/3
+void desenharProgresso(Sala1 *s, ALLEGRO_FONT *fonte) {
+    int a = s->acertos;
+    if (a > ACERTOS_NECESSARIOS) a = ACERTOS_NECESSARIOS;
+
+    al_draw_filled_rounded_rectangle(540, 104, 740, 136, 8, 8,
+                                     al_map_rgba(9, 12, 16, 220));
+    al_draw_rounded_rectangle(540, 104, 740, 136, 8, 8,
+                              al_map_rgba(210, 190, 150, 150), 1);
+    al_draw_textf(fonte, al_map_rgb(238, 224, 196), LARGURA_TELA / 2, 112,
+                  ALLEGRO_ALIGN_CENTER, "PROVAS %d/%d", a, ACERTOS_NECESSARIOS);
+}
+
+// pergunta final no pulpito, com 3 alternativas
+void desenharProvaFinal(Sala1 *s, ALLEGRO_FONT *fonte) {
+    int i;
+    ALLEGRO_COLOR bege = al_map_rgb(238, 224, 196);
+    ALLEGRO_COLOR dourado = al_map_rgb(210, 190, 150);
+    ALLEGRO_COLOR cinza = al_map_rgb(150, 145, 135);
+
+    if (s->estado != ESTADO_PROVA) return;
+
+    al_draw_filled_rounded_rectangle(80, 400, LARGURA_TELA - 80, 695, 12, 12,
+        al_map_rgba(9, 12, 16, 240));
+    al_draw_rounded_rectangle(80, 400, LARGURA_TELA - 80, 695, 12, 12,
+        al_map_rgba(210, 190, 150, 170), 1);
+    al_draw_text(fonte, dourado, 105, 417, 0, "PROVA FINAL");
+    al_draw_multiline_text(fonte, bege, 105, 455, LARGURA_TELA - 210, 26, 0,
+                           PERGUNTA_FINAL);
+
+    for (i = 0; i < TOTAL_OPCOES_PROVA; i++) {
+        float y = 530 + i * 42;
+        if (i == s->opcao) {
+            al_draw_filled_rounded_rectangle(105, y - 6, LARGURA_TELA - 105, y + 30, 6, 6,
+                al_map_rgb(70, 58, 38));
+            al_draw_rounded_rectangle(105, y - 6, LARGURA_TELA - 105, y + 30, 6, 6,
+            dourado, 1);
+        }
+        al_draw_textf(fonte, bege, 125, y + 2, 0, "%c)  %s", 'A' + i, OPCOES_FINAL[i]);
+    }
+    al_draw_text(fonte, cinza, LARGURA_TELA - 105, 668, ALLEGRO_ALIGN_RIGHT,
+                 "SETAS cima/baixo escolhem | [ESPAÇO] confirma");
+}
+
+// cartao Voce sabia?, so aparece depois de acertar a prova final
+void desenharCard(Sala1 *s, ALLEGRO_FONT *fonte, ALLEGRO_FONT *fonte_titulo) {
+    if (s->estado != ESTADO_CARD) return;
+
+    // escurece a sala por tras do cartao
+    al_draw_filled_rectangle(0, 0, LARGURA_TELA, ALTURA_TELA, al_map_rgba(0, 0, 0, 170));
+
+    al_draw_filled_rounded_rectangle(250, 170, 1030, 530, 14, 14,
+        al_map_rgba(9, 12, 16, 245));
+    al_draw_rounded_rectangle(250, 170, 1030, 530, 14, 14,
+        al_map_rgba(210, 190, 150, 200), 2);
+    al_draw_text(fonte_titulo, al_map_rgb(190, 45, 37), LARGURA_TELA / 2, 195,
+                 ALLEGRO_ALIGN_CENTER, "VOCÊ SABIA?");
+    al_draw_multiline_text(fonte, al_map_rgb(238, 224, 196), LARGURA_TELA / 2, 280,
+                680, 28, ALLEGRO_ALIGN_CENTER, CARD_TEXTO);
+    al_draw_text(fonte, al_map_rgb(150, 145, 135), LARGURA_TELA / 2, 480,
+                 ALLEGRO_ALIGN_CENTER, "[ESPAÇO] abrir a porta");
+}
+
+// escurece a tela durante a porta e mostra uma previa da sala 2
+void desenharTransicao(Sala1 *s, ALLEGRO_FONT *fonte) {
+    if (s->estado == ESTADO_PORTA) {
+        int alfa = (s->tempoPorta * 255) / PORTA_DURACAO;
+        if (alfa > 255) alfa = 255;
+        al_draw_filled_rectangle(0, 0, LARGURA_TELA, ALTURA_TELA, al_map_rgba(0, 0, 0, alfa));
+    } else if (s->estado == ESTADO_CONCLUIDA) {
+        al_draw_filled_rectangle(0, 0, LARGURA_TELA, ALTURA_TELA, al_map_rgb(0, 0, 0));
+        al_draw_text(fonte, al_map_rgb(238, 224, 196), LARGURA_TELA / 2, ALTURA_TELA / 2,
+                     ALLEGRO_ALIGN_CENTER, "SALA 2 - em construção");
+    }
+}
+
+// para a musica
+ALLEGRO_AUDIO_STREAM *trocarMusica(ALLEGRO_AUDIO_STREAM *atual, const char *arquivo) {
+    ALLEGRO_AUDIO_STREAM *nova;
+
+    if (atual != NULL) {
+        al_destroy_audio_stream(atual);
+    }
+    nova = al_load_audio_stream(arquivo, 4, 2048);
+    if (nova == NULL) {
+        fprintf(stderr, "aviso: nao carregou %s\n", arquivo);
+        return NULL;
+    }
+    al_attach_audio_stream_to_mixer(nova, al_get_default_mixer());
+    al_set_audio_stream_playmode(nova, ALLEGRO_PLAYMODE_LOOP);
+    al_set_audio_stream_gain(nova, 0.6);
+    return nova;
 }
 
 // main 
@@ -397,10 +746,15 @@ int main(void) {
     ALLEGRO_FONT *fonte = NULL;
     ALLEGRO_FONT *fonte_titulo = NULL; 
     ALLEGRO_FONT *fonte_descricao = NULL;
+    ALLEGRO_AUDIO_STREAM *musica = NULL;
+    ALLEGRO_SAMPLE *somPorta = NULL;
     Jogador jogador;
     Sala1 sala;
     int rodando = 1;
     int redesenhar = 1;
+    int audioOk = 1;
+    int portaTocada = 0;
+    int quadroAbertura = 0;
     // utilizando a biblioteca allegro para pegar o estado do teclado
     ALLEGRO_KEYBOARD_STATE teclado;
 
@@ -427,6 +781,10 @@ int main(void) {
     if (!al_install_keyboard()) {
         fprintf(stderr, "erro da funcao al_install_keyboard()\n");
         return 1;
+    }
+    if (!al_install_audio() || !al_init_acodec_addon() || !al_reserve_samples(4)) {
+        fprintf(stderr, "aviso: audio indisponivel, o jogo roda sem som\n");
+        audioOk = 0;
     }
 
     tela = al_create_display(LARGURA_TELA, ALTURA_TELA);
@@ -508,6 +866,10 @@ int main(void) {
         return 1;
     }
 
+    if (audioOk) {
+        musica = trocarMusica(NULL, "assets/audio/leberch-dark-628052.mp3");
+    }
+
     // removido carregarSprites e liberarSprites, pois nao ha mais necessidade de carregar 9 imagens separadas
 
     al_register_event_source(fila, al_get_display_event_source(tela));
@@ -525,39 +887,87 @@ int main(void) {
         if (evento.type == ALLEGRO_EVENT_DISPLAY_CLOSE) {
             rodando = 0;
         }
-        if (evento.type == ALLEGRO_EVENT_KEY_DOWN &&
-            evento.keyboard.keycode == ALLEGRO_KEY_ESCAPE) {
-            rodando = 0;
-        }
-        if (evento.type == ALLEGRO_EVENT_KEY_DOWN &&
-            evento.keyboard.keycode == ALLEGRO_KEY_SPACE) {
-            interagir(&sala, &jogador);
+        if (evento.type == ALLEGRO_EVENT_KEY_DOWN) {
+            int tecla = evento.keyboard.keycode;
+
+            if (tecla == ALLEGRO_KEY_ESCAPE) {
+                rodando = 0;
+            }
+            if (quadroAbertura >= ABERTURA_TITULO + ABERTURA_FADE) {
+                if (tecla == ALLEGRO_KEY_SPACE) {
+                    interagir(&sala, &jogador);
+                }
+                if (tecla == ALLEGRO_KEY_LEFT || tecla == ALLEGRO_KEY_A) {
+                    escolherOpcao(&sala, 0);    // FATO
+                }
+                if (tecla == ALLEGRO_KEY_RIGHT || tecla == ALLEGRO_KEY_D) {
+                    escolherOpcao(&sala, 1);    // PROPAGANDA
+                }
+                if (tecla == ALLEGRO_KEY_UP || tecla == ALLEGRO_KEY_W) {
+                    mudarOpcaoProva(&sala, -1);
+                }
+                if (tecla == ALLEGRO_KEY_DOWN || tecla == ALLEGRO_KEY_S) {
+                    mudarOpcaoProva(&sala, 1);
+                }
+            }
         }
         if (evento.type == ALLEGRO_EVENT_TIMER) {
-            sala.tempo++;
-            if (sala.estado == ESTADO_JOGANDO) {
-                al_get_keyboard_state(&teclado);
-                // faz o personagem andar de acordo com a tecla pressionada
-                moverJogador(&jogador, &teclado);
+            if (quadroAbertura < ABERTURA_TITULO + ABERTURA_FADE) {
+                quadroAbertura++;
             } else {
-                jogador.frame = 0;
+                sala.tempo++;
+                if (sala.estado == ESTADO_JOGANDO) {
+                    al_get_keyboard_state(&teclado);
+                    // faz o personagem andar de acordo com a tecla pressionada
+                    moverJogador(&jogador, &teclado);
+                } else {
+                    jogador.frame = 0;
+                }
+                // transicao da porta: silencia a musica durante o fade
+                if (sala.estado == ESTADO_PORTA) {
+                    if (!portaTocada) {
+                        portaTocada = 1;
+                        if (musica != NULL) {
+                            al_set_audio_stream_playing(musica, false);
+                        }
+                        if (somPorta != NULL) {
+                            al_play_sample(somPorta, 1.0, 0.0, 1.0,
+                                           ALLEGRO_PLAYMODE_ONCE, NULL);
+                        }
+                    }
+                    sala.tempoPorta++;
+                    if (sala.tempoPorta >= PORTA_DURACAO) {
+                        jogador.sala = 2;
+                        sala.estado = ESTADO_CONCLUIDA;
+                    }
+                }
             }
             redesenhar = 1;
         }
 
         if (redesenhar && al_is_event_queue_empty(fila)) {
             redesenhar = 0;
-            desenharCenario(fundo);
-            desenharJogador(&jogador, spritesheet);
-            desenharIcone(&jogador, &sala, fonte);
-            desenharHUD(&jogador, fonte);
-            desenharCaixaTexto(&sala, fonte);
-            desenharIdentidade(fonte_titulo, fonte_descricao);
-            desenharFlash(&jogador);
+            if (quadroAbertura < ABERTURA_TITULO + ABERTURA_FADE) {
+                desenharTelaInicial(fonte_titulo, quadroAbertura);
+            } else {
+                desenharCenario(fundo);
+                desenharJogador(&jogador, spritesheet);
+                desenharIcone(&jogador, &sala, fonte);
+                desenharHUD(&jogador, fonte);
+                desenharProgresso(&sala, fonte);
+                desenharPainel(&sala, fonte);
+                desenharProvaFinal(&sala, fonte);
+                desenharIdentidade(fonte_titulo, fonte_descricao);
+                desenharFlash(&jogador);
+                desenharCard(&sala, fonte, fonte_titulo);
+                desenharTransicao(&sala, fonte);
+            }
             al_flip_display();
         }
     }
 
+    if (somPorta != NULL) al_destroy_sample(somPorta);
+    if (musica != NULL) al_destroy_audio_stream(musica);
     al_destroy_font(fonte);
     al_destroy_font(fonte_descricao);
     al_destroy_font(fonte_titulo);
