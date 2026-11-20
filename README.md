@@ -22,12 +22,46 @@ shift-space-run/
 
 ## Como compilar
 
-Requer o Allegro 5 instalado e configurado no PATH/compilador (MinGW).
+Compile os comandos a partir da raiz do projeto. Eles criam o executável dentro da pasta `build/`.
 
+### Windows (MSYS2 UCRT64)
+
+Instale o MSYS2 e, no terminal **UCRT64**, instale o compilador, o `pkg-config` e o Allegro 5:
+
+```bash
+pacman -S --needed mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-pkgconf mingw-w64-ucrt-x86_64-allegro
 ```
-gcc src/main.c -o build/shift-space-run -lallegro -lallegro_main -lallegro_image -lallegro_primitives -lallegro_font -lallegro_ttf
+
+Compile o jogo:
+
+```bash
+mkdir -p build && gcc -g src/main.c -o build/shift-space-run.exe $(pkg-config --cflags allegro-5 allegro_image-5 allegro_primitives-5 allegro_font-5 allegro_ttf-5 allegro_audio-5 allegro_acodec-5) $(pkg-config --libs allegro-5 allegro_main-5 allegro_image-5 allegro_primitives-5 allegro_font-5 allegro_ttf-5 allegro_audio-5 allegro_acodec-5)
 ```
 
-Ou use a task configurada em `.vscode/tasks.json` (Ctrl+Shift+B).
+Para iniciar o jogo no mesmo terminal UCRT64:
 
-No macOS, o módulo `allegro_main-5` continua necessário para o linker encontrar a função `main` do Allegro.
+```bash
+./build/shift-space-run.exe
+```
+
+### macOS
+
+Instale o Allegro 5 e o `pkg-config` pelo Homebrew:
+
+```bash
+brew install allegro pkg-config
+```
+
+Compile o jogo:
+
+```bash
+mkdir -p build && /usr/bin/clang -fdiagnostics-color=always -g src/main.c -o build/shift-space-run $(pkg-config --cflags allegro-5 allegro_image-5 allegro_primitives-5 allegro_font-5 allegro_ttf-5 allegro_audio-5 allegro_acodec-5) $(pkg-config --libs allegro-5 allegro_main-5 allegro_image-5 allegro_primitives-5 allegro_font-5 allegro_ttf-5 allegro_audio-5 allegro_acodec-5)
+```
+
+Para iniciar o jogo a partir da raiz do projeto:
+
+```bash
+./build/shift-space-run
+```
+
+O módulo `allegro_main-5` é necessário para o linker encontrar a função `main` do Allegro. No VS Code para macOS, também é possível compilar com **Terminal > Run Build Task** (ou `Cmd+Shift+B`).
