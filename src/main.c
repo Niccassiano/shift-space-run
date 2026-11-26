@@ -818,6 +818,44 @@ static const char *AVISO_MESA =
     "Esta é a mesa de comando, com o mapa da Europa. Antes de marcar os ataques, leia os 3 relatórios "
     "em cima do balcão, ao lado da mesa. Procure os papéis com brilho azul.";
 
+typedef struct {
+    int estado;
+    Relatorio relatorios[TOTAL_RELATORIOS];
+    int relatorioAtivo;            // 0, 1, 2 = relatorio / INDICE_MESA = aviso da mesa
+    int lidos;                     // quantos relatorios diferentes ja foram lidos
+    float movFx, movFy;            // posicao (0.0 a 1.0 no mapa) do pino que o jogador esta movendo
+    float pinoFx[TOTAL_CIDADES];   // posicao dos pinos que ja foram colocados no mapa
+    float pinoFy[TOTAL_CIDADES];
+    int qtdPinos;                  // quantos pinos ja estao no mapa
+    int espera;                    // contador de frames mostrando o resultado
+    int acertou;                   // resultado da ultima conferencia
+    int tempo;                     // conta frames (para piscar e fade)
+    int tempoPorta;
+} Sala2;
+
+// guarda um relatorio no vetor, na posicao i
+void adicionarRelatorio(Sala2 *s, int i, float x, float y, float desenhoX, float desenhoY,
+                        const char *titulo, const char *texto) {
+    Relatorio *r = &s->relatorios[i];
+    r->x = x;
+    r->y = y;
+    r->desenhoX = desenhoX;
+    r->desenhoY = desenhoY;
+    r->lido = 0;
+    strcpy(r->titulo, titulo);
+    strcpy(r->texto, texto);
+}
+
+// posicao (de 0.0 a 1.0) do lugar do pino numero i na bandeja embaixo do mapa
+float bandejaFx(int i) {
+    return 0.385f + i * 0.115f;
+}
+
+// o proximo pino volta para o lugar dele na bandeja, pronto para ser movido
+void pegarProximoPino(Sala2 *s) {
+    s->movFx = bandejaFx(s->qtdPinos);
+    s->movFy = BANDEJA_FY;
+}
 
 
 
