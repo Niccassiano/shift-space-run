@@ -1278,9 +1278,6 @@ void desenharSala2(Sala2 *s, Jogador *j,
 
 // ====================== FIM DA SALA 2 ======================
 
-
-// main
-
 int main(void) {
     ALLEGRO_DISPLAY *tela = NULL;
     ALLEGRO_EVENT_QUEUE *fila = NULL;
@@ -1301,6 +1298,13 @@ int main(void) {
     int quadroAbertura = 0;
     // utilizando a biblioteca allegro para pegar o estado do teclado
     ALLEGRO_KEYBOARD_STATE teclado;
+
+    ALLEGRO_BITMAP *fundoSala2 = NULL;
+    ALLEGRO_BITMAP *mapaSala2 = NULL;
+    ALLEGRO_BITMAP *pinos = NULL;
+    ALLEGRO_BITMAP *papeis = NULL;
+    Sala2 sala2;
+    int sala2Iniciada = 0;
 
     if (!al_init()) {
         fprintf(stderr, "erro da funcao al_init()\n");
@@ -1371,6 +1375,27 @@ int main(void) {
         return 1;
     }
 
+    fundoSala2 = al_load_bitmap(ARQ_FUNDO_SALA2);
+    if (fundoSala2 == NULL) {
+        fprintf(stderr, "erro da funcao al_load_bitmap() para o fundo da sala 2 (%s)\n", ARQ_FUNDO_SALA2);
+        return 1;
+    }
+    mapaSala2 = al_load_bitmap(ARQ_MAPA_SALA2);
+    if (mapaSala2 == NULL) {
+        fprintf(stderr, "erro da funcao al_load_bitmap() para o mapa da sala 2 (%s)\n", ARQ_MAPA_SALA2);
+        return 1;
+    }
+    pinos = al_load_bitmap(ARQ_PINOS);
+    if (pinos == NULL) {
+        fprintf(stderr, "erro da funcao al_load_bitmap() para os pinos (%s)\n", ARQ_PINOS);
+        return 1;
+    }
+    papeis = al_load_bitmap(ARQ_PAPEIS);
+    if (papeis == NULL) {
+        fprintf(stderr, "erro da funcao al_load_bitmap() para os papeis (%s)\n", ARQ_PAPEIS);
+        return 1;
+    }
+
     // carrega a fonte do titulo
     fonte_titulo = al_load_ttf_font("fonts/hermes-1943/HERMES 1943.ttf", 40, 0);
     if (fonte_titulo == NULL) {
@@ -1414,14 +1439,13 @@ int main(void) {
         musica = trocarMusica(NULL, "assets/audio/leberch-dark-628052.mp3");
     }
 
-    // removido carregarSprites e liberarSprites, pois nao ha mais necessidade de carregar 9 imagens separadas
-
     al_register_event_source(fila, al_get_display_event_source(tela));
     al_register_event_source(fila, al_get_timer_event_source(timer));
     al_register_event_source(fila, al_get_keyboard_event_source());
 
     iniciarJogador(&jogador);
     iniciarSala1(&sala);
+    iniciarSala2(&sala2);
     al_start_timer(timer);
 
     while (rodando) {
@@ -1453,11 +1477,37 @@ int main(void) {
                 if (tecla == ALLEGRO_KEY_DOWN || tecla == ALLEGRO_KEY_S) {
                     mudarOpcaoProva(&sala, 1);
                 }
+                // As funcoes da sala 1 nao fazem nada depois que ela e concluida.
+                if (jogador.sala >= 2) {
+                    teclasSala2(&sala2, &jogador, tecla);
+                }
             }
         }
         if (evento.type == ALLEGRO_EVENT_TIMER) {
             if (quadroAbertura < ABERTURA_TITULO + ABERTURA_FADE) {
                 quadroAbertura++;
+            } else if (jogador.sala >= 2) {
+                if (!sala2Iniciada) {
+                    // primeiro tick da sala 2: posiciona o jogador
+                    sala2Iniciada = 1;
+                    iniciarSala2(&sala2);
+                    jogador.x = 640;
+                    jogador.y = 690;
+                    jogador.direcao = 0;
+                    jogador.frame = 0;
+                }
+                if (sala2.estado == ESTADO2_JOGANDO) {
+                    al_get_keyboard_state(&teclado);
+                    moverJogador(&jogador, &teclado);
+                } else {
+                    jogador.frame = 0;
+                    if (sala2.estado == ESTADO2_MAPA) {
+                        // mapa aberto: as setas movem o pino em vez do personagem
+                        al_get_keyboard_state(&teclado);
+                        moverPino(&sala2, &teclado);
+                    }
+                }
+                atualizarSala2(&sala2);
             } else {
                 sala.tempo++;
                 if (sala.estado == ESTADO_JOGANDO) {
@@ -1493,6 +1543,9 @@ int main(void) {
             redesenhar = 0;
             if (quadroAbertura < ABERTURA_TITULO + ABERTURA_FADE) {
                 desenharTelaInicial(fonte_titulo, quadroAbertura);
+            } else if (jogador.sala >= 2) {
+                desenharSala2(&sala2, &jogador, fundoSala2, spritesheet, mapaSala2, pinos, papeis,
+                              fonte, fonte_titulo, fonte_descricao);
             } else {
                 desenharCenario(fundo);
                 desenharJogador(&jogador, spritesheet);
@@ -1515,6 +1568,10 @@ int main(void) {
     al_destroy_font(fonte);
     al_destroy_font(fonte_descricao);
     al_destroy_font(fonte_titulo);
+    al_destroy_bitmap(papeis);
+    al_destroy_bitmap(pinos);
+    al_destroy_bitmap(mapaSala2);
+    al_destroy_bitmap(fundoSala2);
     al_destroy_bitmap(spritesheet);
     al_destroy_bitmap(fundo);
     al_destroy_timer(timer);
