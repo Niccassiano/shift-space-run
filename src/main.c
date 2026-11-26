@@ -785,6 +785,38 @@ ALLEGRO_AUDIO_STREAM *trocarMusica(ALLEGRO_AUDIO_STREAM *atual, const char *arqu
 
 // SALA 2
 
+// um relatorio (papel) em cima do balcao
+typedef struct {
+    float x, y;                // onde o jogador fica para poder ler
+    float desenhoX, desenhoY;  // onde o papel aparece desenhado no cenario centro do papel
+    int lido;                  
+    char titulo[48];
+    char texto[320];
+} Relatorio;
+
+// uma cidade marcavel no mapa
+typedef struct {
+    const char *nome;
+    float fx, fy;
+} Cidade;
+
+static const Cidade CIDADES[TOTAL_CIDADES] = {
+    { "Londres",  0.275f, 0.427f },
+    { "Roterdã",  0.366f, 0.420f },
+    { "Varsóvia", 0.635f, 0.451f }
+};
+
+// indica a ordem certa dos pinos no mapa
+static const int ORDEM_CORRETA[TOTAL_CIDADES] = { 2, 1, 0 };
+
+static const char *CARD_TEXTO_SALA2 =
+    "A invasão da Polônia, em 1º de setembro de 1939, marca o início da Segunda Guerra Mundial na Europa. "
+    "Com o avanço rápido e os bombardeios em cidades como Varsóvia, Roterdã e Londres, o conflito deixou de "
+    "atingir apenas frentes militares e passou a castigar áreas urbanas e civis, mostrando a lógica da guerra total.";
+
+static const char *AVISO_MESA =
+    "Esta é a mesa de comando, com o mapa da Europa. Antes de marcar os ataques, leia os 3 relatórios "
+    "em cima do balcão, ao lado da mesa. Procure os papéis com brilho azul.";
 
 
 
