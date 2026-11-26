@@ -24,6 +24,7 @@
 #define LIMITE_ESQ 40
 #define LIMITE_DIR 1240
 #define LIMITE_CIMA 500
+#define LIMITE_CIMA_SALA2 250
 #define LIMITE_BAIXO 700
 
 // tamanho do cenario, 6 salas, cada sala tem 1280x720
@@ -73,9 +74,9 @@
 // define SALA 02
 
 #define ARQ_FUNDO_SALA2 "assets/sala02_fundo.png"
-#define ARQ_MAPA_SALA2  "Sprites/mapaSala2.png"
-#define ARQ_PINOS       "Sprites/pinos.png"   // caminho do arquivo
-#define ARQ_PAPEIS      "Sprites/papeis.png"  
+#define ARQ_MAPA_SALA2  "sprites/mapaSala2.png"
+#define ARQ_PINOS       "sprites/pinos.png"
+#define ARQ_PAPEIS      "sprites/papeis.png"
 
 // quantidades
 #define TOTAL_RELATORIOS 3
@@ -83,7 +84,7 @@
 #define INDICE_MESA      3     // serve pra saber ser ele ta interagindo com a mesa ou o papel
 
 // interacao 
-#define RAIO_RELATORIO 70
+#define RAIO_RELATORIO 90
 #define MESA_X    777          // onde o jogador fica em frente a mesa do mapa
 #define MESA_Y    640
 #define MESA_RAIO 130
@@ -248,6 +249,7 @@ void moverJogador(Jogador *j, ALLEGRO_KEYBOARD_STATE *teclado) {
     float vel = j->velocidade;
     int andando = 0;
     int trocaFrame = 10;
+    int limiteCima = j->sala >= 2 ? LIMITE_CIMA_SALA2 : LIMITE_CIMA;
 
     // segurando o shift = modo furtivo 
     if (al_key_down(teclado, ALLEGRO_KEY_LSHIFT) ||
@@ -283,7 +285,7 @@ void moverJogador(Jogador *j, ALLEGRO_KEYBOARD_STATE *teclado) {
     // limita a area de movimentacao do personagem para que ele nao saia
     if (j->x < LIMITE_ESQ) j->x = LIMITE_ESQ;
     if (j->x > LIMITE_DIR) j->x = LIMITE_DIR;
-    if (j->y < LIMITE_CIMA) j->y = LIMITE_CIMA;
+    if (j->y < limiteCima) j->y = limiteCima;
     if (j->y > LIMITE_BAIXO) j->y = LIMITE_BAIXO;
 
     // alterando os frames enquanto anda
