@@ -1057,7 +1057,7 @@ void atualizarSala2(Sala2 *s) {
     }
 }
 
-// ----------------------------- DESENHO DA SALA 2 -----------------------------
+// desenho da sala 2, com o jogador, os relatorios e a mesa
 
 // os 3 papeis em cima do balcao, usando o sprite papeis.png
 // depois de lido, o papel fica cinza (mas pode ser lido de novo)
@@ -1278,7 +1278,7 @@ void desenharSala2(Sala2 *s, Jogador *j,
     desenharTransicaoSala2(s, fonte);
 }
 
-// ====================== FIM DA SALA 2 ======================
+// fim da sala 2: o jogador ja leu os 3 relatorios, colocou os pinos no mapa e abriu a porta
 
 int main(void) {
     ALLEGRO_DISPLAY *tela = NULL;
