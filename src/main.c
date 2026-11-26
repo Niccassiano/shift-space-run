@@ -70,6 +70,54 @@
 #define ABERTURA_TITULO 95        // duracao do titulo antes de escurecer (~0,75 s)
 #define ABERTURA_FADE 30          // duracao de cada fade (~0,3 s)
 
+// define SALA 02
+
+#define ARQ_FUNDO_SALA2 "assets/sala02_fundo.png"
+#define ARQ_MAPA_SALA2  "Sprites/mapaSala2.png"
+#define ARQ_PINOS       "Sprites/pinos.png"   // caminho do arquivo
+#define ARQ_PAPEIS      "Sprites/papeis.png"  
+
+// quantidades
+#define TOTAL_RELATORIOS 3
+#define TOTAL_CIDADES    3
+#define INDICE_MESA      3     // serve pra saber ser ele ta interagindo com a mesa ou o papel
+
+// interacao 
+#define RAIO_RELATORIO 70
+#define MESA_X    777          // onde o jogador fica em frente a mesa do mapa
+#define MESA_Y    640
+#define MESA_RAIO 130
+
+// papeis desenhados 
+#define PAPEL_LARG 84
+#define PAPEL_ALT  54
+
+// mapa desenhado na tela, com os pinos que o jogador deve colocar
+#define MAPA_LARG  780
+#define MAPA_POS_Y 105
+#define PINO_TAM   40          // tamanho do pino desenhado na tela
+
+// pinos
+#define BANDEJA_FY  1.10f
+#define PINO_VEL_X  0.006f     // quanto o pino anda ao segurar a seta
+#define PINO_VEL_Y  0.011f
+#define TOL_PINO_X  0.05f
+#define TOL_PINO_Y  0.08f
+
+//  tempos em frames, 60 = 1 segundo
+#define ESPERA_PINOS   90      // tempo mostrando o resultado depois do 3o pino
+#define FADE_ENTRADA   45      //  ao entrar na sala 2
+#define PORTA2_DURACAO 180     //  para preto ao sair da sala 2
+
+// estado sala 02
+#define ESTADO2_JOGANDO   0    // andando
+#define ESTADO2_LENDO     1    // caixa de texto aberta
+#define ESTADO2_MAPA      2    // mapa aberto, colocando pinos
+#define ESTADO2_CARD      3    // cartao "Voce sabia?"
+#define ESTADO2_PORTA     4    // tela escurecendo
+#define ESTADO2_CONCLUIDA 5    // fim da sala 2
+
+
 // cria uma variavel global para a pergunta final e as opcoes de resposta, para que o jogador possa interagir com o pulpito e responder a pergunta final
 static const char *PERGUNTA_FINAL =
     "Em 1935, as Leis de Nuremberg foram anunciadas. O que elas fizeram?";
@@ -734,6 +782,13 @@ ALLEGRO_AUDIO_STREAM *trocarMusica(ALLEGRO_AUDIO_STREAM *atual, const char *arqu
     al_set_audio_stream_gain(nova, 0.6);
     return nova;
 }
+
+// SALA 2
+
+
+
+
+
 
 // main 
 
